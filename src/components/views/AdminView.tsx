@@ -3,7 +3,8 @@ import { Product, Order, ProductDownloadFile, PaymentConfig } from '../../types'
 import { 
   ShieldCheck, Package, DollarSign, Users, AlertCircle, Plus, Edit, Check, 
   Trash2, Video, FileCode, Upload, Image as ImageIcon, Eye, X, Lock, Sparkles, Download,
-  MapPin, Zap, Box, QrCode, CreditCard, Database, RefreshCw, Save, HardDrive, CheckCircle2
+  MapPin, Zap, Box, QrCode, CreditCard, Database, RefreshCw, Save, HardDrive, CheckCircle2,
+  Cloud, Globe, Wifi, WifiOff, ExternalLink, Copy, CheckCircle, AlertTriangle, ArrowUpRight
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
 import { 
@@ -14,6 +15,17 @@ import {
   importDatabaseBackup,
   saveMediaFileToDB
 } from '../../utils/database';
+import { 
+  getStoredFirebaseConfig, 
+  saveStoredFirebaseConfig, 
+  isFirebaseConfigured, 
+  FirebaseConfigData,
+  initFirebase
+} from '../../services/firebaseConfig';
+import { 
+  cloudBulkUploadProducts, 
+  testCloudConnection 
+} from '../../services/cloudDatabase';
 
 interface AdminViewProps {
   products: Product[];
@@ -24,6 +36,7 @@ interface AdminViewProps {
   isCreator: boolean;
   onRequestLoginCreator: () => void;
   onLogoutCreator: () => void;
+  isCloudActive?: boolean;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -34,13 +47,164 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onDeleteProduct,
   isCreator,
   onRequestLoginCreator,
-  onLogoutCreator
+  onLogoutCreator,
+  isCloudActive = false
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'payment_config' | 'database'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'payment_config' | 'database' | 'cloud_sync'>('products');
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [tempStock, setTempStock] = useState<number>(0);
 
-  // New Product Form State
+  // Cloud Synchronization State
+  const [isCloudConfiguredState, setIsCloudConfiguredState] = useState<boolean>(() => isFirebaseConfigured());
+  const [firebaseConfigForm, setFirebaseConfigForm] = useState<FirebaseConfigData>(() => {
+    return getStoredFirebaseConfig() || {
+      apiKey: '',
+      authDomain: '',
+      projectId: '',
+      storageBucket: '',
+      messagingSenderId: '',
+      appId: ''
+    };
+  });
+  const [rawSnippet, setRawSnippet] = useState('');
+  const [snippetParseMessage, setSnippetParseMessage] = useState('');
+  const [cloudTestResult, setCloudTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isTestingCloud, setIsTestingCloud] = useState(false);
+  const [isBulkSyncing, setIsBulkSyncing] = useState(false);
+  const [bulkSyncResult, setBulkSyncResult] = useState<string | null>(null);
+  // Cloud & Edit handlers
+  const handleStartEditProduct = (p: Product) => {
+    setEditingProduct(p);
+    setName(p.name);
+    setCategory(p.category === 'porquesi' ? 'porquesi' : p.category);
+    setProductModality(p.productType || (p.category === 'virtuales' ? 'virtual' : 'fisico'));
+    setPrice(p.price.toString());
+    setOriginalPrice(p.originalPrice ? p.originalPrice.toString() : '');
+    setDiscountBadge(p.discountBadge || '');
+    setBadgeLabel(p.badgeLabel || '');
+    setSecondaryBadge(p.secondaryBadge || '');
+    setDescription(p.description);
+    setFullDetails(p.fullDetails || '');
+    setDeliveryInfo(p.deliveryInfo || '');
+    setStock(p.stock !== undefined ? p.stock.toString() : '20');
+    setImageUrl(p.imageUrl);
+    setVideoUrl(p.videoUrl || '');
+    setDownloadFile(p.downloadFile || null);
+    setPickupLocations(p.pickupLocations || ['Plaza Central / Parque Principal', 'Estación Central / Tren', 'Taller Gift Corner Lab']);
+    setFeatures(p.features || ['Garantía oficial Gift Corner Lab', 'Atención personalizada']);
+    setIsCreatingProduct(true);
+    setActiveTab('products');
+    sfx.playClick();
+  };
+
+  const handleCancelForm = () => {
+    setEditingProduct(null);
+    setIsCreatingProduct(false);
+    setName('');
+    setDescription('');
+    setFullDetails('');
+    setImageUrl('');
+    setVideoUrl('');
+    setDownloadFile(null);
+    setFeatures(['Garantía oficial Gift Corner Lab', 'Atención personalizada']);
+    setFormError('');
+    setFormSuccess('');
+  };
+
+  const handleParseSnippet = () => {
+    if (!rawSnippet.trim()) return;
+    try {
+      const extractVal = (key: string) => {
+        const regex = new RegExp(`${key}\\s*:\\s*["']([^"']+)["']`);
+        const match = rawSnippet.match(regex);
+        return match ? match[1] : '';
+      };
+
+      const apiKey = extractVal('apiKey');
+      const authDomain = extractVal('authDomain');
+      const projectId = extractVal('projectId');
+      const storageBucket = extractVal('storageBucket');
+      const messagingSenderId = extractVal('messagingSenderId');
+      const appId = extractVal('appId');
+
+      if (apiKey && projectId && appId) {
+        const parsed: FirebaseConfigData = {
+          apiKey,
+          authDomain: authDomain || `${projectId}.firebaseapp.com`,
+          projectId,
+          storageBucket: storageBucket || `${projectId}.appspot.com`,
+          messagingSenderId: messagingSenderId || '',
+          appId
+        };
+        setFirebaseConfigForm(parsed);
+        setSnippetParseMessage('¡Datos extraídos con éxito! Presiona "Guardar y Conectar" para activar.');
+        sfx.playChime();
+      } else {
+        setSnippetParseMessage('No se encontraron todos los campos requeridos (apiKey, projectId, appId). Revisa el texto pegado.');
+      }
+    } catch {
+      setSnippetParseMessage('No se pudo procesar el texto. Puedes ingresar los campos manualmente abajo.');
+    }
+  };
+
+  const handleTestCloudConnection = async () => {
+    setIsTestingCloud(true);
+    setCloudTestResult(null);
+    sfx.playClick();
+
+    const result = await testCloudConnection(firebaseConfigForm);
+    setIsTestingCloud(false);
+    setCloudTestResult(result);
+    if (result.success) {
+      sfx.playChime();
+    }
+  };
+
+  const handleSaveFirebaseConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!firebaseConfigForm.apiKey || !firebaseConfigForm.projectId || !firebaseConfigForm.appId) {
+      alert('Por favor completa al menos apiKey, projectId y appId.');
+      return;
+    }
+
+    saveStoredFirebaseConfig(firebaseConfigForm);
+    initFirebase(firebaseConfigForm);
+    setIsCloudConfiguredState(true);
+    sfx.playChime();
+    alert('¡Configuración de Firebase guardada correctamente! La tienda ahora sincroniza en tiempo real con todos tus clientes.');
+    window.location.reload();
+  };
+
+  const handleDisconnectCloud = () => {
+    if (confirm('¿Deseas desconectar Firebase? La tienda pasará a funcionar solo con el almacenamiento local de este navegador.')) {
+      saveStoredFirebaseConfig(null);
+      setIsCloudConfiguredState(false);
+      sfx.playClick();
+      alert('Firebase desconectado.');
+      window.location.reload();
+    }
+  };
+
+  const handleBulkSyncNow = async () => {
+    if (!isCloudConfiguredState) {
+      alert('Debes configurar y guardar las credenciales de Firebase primero.');
+      return;
+    }
+    setIsBulkSyncing(true);
+    setBulkSyncResult(null);
+    sfx.playClick();
+
+    const res = await cloudBulkUploadProducts(products);
+    setIsBulkSyncing(false);
+    if (res.error) {
+      setBulkSyncResult(`Error al sincronizar: ${res.error}`);
+    } else {
+      setBulkSyncResult(`¡Éxito! Se han subido y sincronizado ${res.count} productos en la nube.`);
+      sfx.playChime();
+    }
+  };
+
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [productModality, setProductModality] = useState<'virtual' | 'fisico'>('virtual');
   const [name, setName] = useState('');
@@ -243,9 +407,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
     const isVirtual = productModality === 'virtual';
 
     const newProd: Product = {
-      id: `prod-${Date.now()}`,
+      id: editingProduct ? editingProduct.id : `prod-${Date.now()}`,
       name: name.trim(),
-      category: isVirtual ? 'virtuales' : 'fisicos',
+      category: category,
       productType: productModality,
       price: numPrice,
       originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
@@ -268,7 +432,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     onAddProduct(newProd);
     sfx.playChime();
-    setFormSuccess('¡Producto creado con éxito y publicado en el catálogo!');
+    setFormSuccess(editingProduct ? '¡Producto actualizado con éxito y sincronizado en el catálogo!' : '¡Producto creado con éxito y publicado en el catálogo!');
 
     // Reset Form
     setName('');
@@ -278,6 +442,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setVideoUrl('');
     setDownloadFile(null);
     setFeatures(['Garantía oficial Gift Corner Lab', 'Atención personalizada']);
+    setEditingProduct(null);
 
     setTimeout(() => {
       setIsCreatingProduct(false);
@@ -347,18 +512,40 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Cloud Sync Quick Indicator */}
           <button
             type="button"
             onClick={() => {
               sfx.playClick();
-              setIsCreatingProduct(!isCreatingProduct);
-              setActiveTab('products');
+              setActiveTab('cloud_sync');
+            }}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 border transition-all ${
+              isCloudConfiguredState
+                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/40'
+                : 'bg-amber-950/40 border-amber-500/40 text-amber-300 hover:bg-amber-900/40 animate-pulse'
+            }`}
+            title="Haz clic para administrar la sincronización en la nube"
+          >
+            <Cloud className="w-4 h-4" />
+            <span>{isCloudConfiguredState ? 'Nube Conectada 🟢' : 'Conectar Nube 🟠'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              sfx.playClick();
+              if (isCreatingProduct) {
+                handleCancelForm();
+              } else {
+                setIsCreatingProduct(true);
+                setActiveTab('products');
+              }
             }}
             className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#7c3aed] to-[#03b5d3] hover:opacity-95 text-white font-display text-xs font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95"
             id="admin-create-product-btn"
           >
             <Plus className="w-4 h-4" />
-            <span>{isCreatingProduct ? 'Cerrar Formulario' : 'Crear Producto'}</span>
+            <span>{isCreatingProduct ? (editingProduct ? 'Cancelar Edición' : 'Cerrar Formulario') : 'Crear Producto'}</span>
           </button>
 
           <button
@@ -374,7 +561,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </div>
       </div>
 
-      {/* Navigation Tabs (Productos, Config de Pagos & Yape, Base de Datos) */}
+      {/* Navigation Tabs (Productos, Config de Pagos & Yape, Nube Multidispositivo, Base de Datos) */}
       <div className="flex items-center gap-2 p-1.5 bg-[#191b23] rounded-2xl border border-white/10 overflow-x-auto">
         <button
           type="button"
@@ -387,6 +574,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
         >
           <Package className="w-4 h-4" />
           <span>Gestión de Productos ({products.length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveTab('cloud_sync'); sfx.playClick(); }}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+            activeTab === 'cloud_sync'
+              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+          }`}
+        >
+          <Cloud className="w-4 h-4" />
+          <span>Sincronización Nube (Multidispositivo) {isCloudConfiguredState ? '🟢' : '🟠'}</span>
         </button>
 
         <button
@@ -412,29 +612,29 @@ export const AdminView: React.FC<AdminViewProps> = ({
           }`}
         >
           <Database className="w-4 h-4" />
-          <span>Base de Datos &amp; Almacenamiento ({dbStats.mbUsed} MB)</span>
+          <span>Base de Datos Local ({dbStats.mbUsed} MB)</span>
         </button>
       </div>
 
       {/* ================= TAB 1: PRODUCT MANAGEMENT & CREATOR ================= */}
       {activeTab === 'products' && (
         <>
-          {/* CREATE NEW PRODUCT FORM */}
+          {/* CREATE / EDIT PRODUCT FORM */}
           {isCreatingProduct && (
             <section className="rounded-3xl bg-[#191b23] border border-[#7c3aed]/40 p-6 sm:p-8 shadow-2xl animate-fadeIn relative overflow-hidden">
               <div className="flex items-center justify-between pb-4 mb-6 border-b border-white/10">
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#7c3aed]/20 text-[#d2bbff] text-[11px] font-bold uppercase mb-1">
-                    <Sparkles className="w-3 h-3" /> Catálogo en Vivo
+                    <Sparkles className="w-3 h-3" /> {editingProduct ? 'Modo Edición' : 'Catálogo en Vivo'}
                   </div>
                   <h2 className="font-display text-xl font-bold text-[#e1e2ec]">
-                    Publicar un Nuevo Producto en la Tienda
+                    {editingProduct ? `Editar: ${editingProduct.name}` : 'Publicar un Nuevo Producto en la Tienda'}
                   </h2>
                 </div>
 
                 <button
                   type="button"
-                  onClick={() => setIsCreatingProduct(false)}
+                  onClick={handleCancelForm}
                   className="p-2 rounded-xl bg-[#272a32] text-[#e1e2ec] hover:bg-[#32353d]"
                 >
                   <X className="w-5 h-5" />
@@ -752,9 +952,28 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         )}
                       </td>
                       <td className="py-3 px-2 text-right">
-                        <button onClick={() => onDeleteProduct(p.id)} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-lg transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditProduct(p)}
+                            title="Editar detalles del producto"
+                            className="p-2 text-[#03b5d3] hover:text-white hover:bg-[#03b5d3]/20 rounded-lg transition-colors"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`¿Seguro que deseas eliminar "${p.name}"? Se borrará de la nube para todos los clientes.`)) {
+                                onDeleteProduct(p.id);
+                              }
+                            }}
+                            title="Eliminar producto"
+                            className="p-2 text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-lg transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -932,6 +1151,293 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <Upload className="w-4 h-4 text-[#d2bbff]" /> Importar Respaldo
                 <input type="file" accept=".json" onChange={handleImportDB} className="hidden" />
               </label>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ================= TAB 4: CLOUD SYNCHRONIZATION (MULTIDEVICE) ================= */}
+      {activeTab === 'cloud_sync' && (
+        <section className="p-6 sm:p-8 rounded-3xl bg-[#191b23] border border-emerald-500/30 shadow-2xl flex flex-col gap-6 animate-fadeIn">
+          {/* Header */}
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-bold uppercase mb-2">
+              <Globe className="w-4 h-4 text-emerald-400" /> Sincronización Multidispositivo en Tiempo Real
+            </div>
+            <h2 className="font-display text-2xl font-bold text-[#e1e2ec]">
+              Base de Datos en la Nube (Firebase Firestore)
+            </h2>
+            <p className="text-xs text-[#ccc3d8]">
+              Conecta tu tienda con una base de datos central en la nube para que cuando agregues, edites o borres un producto, el cambio aparezca al instante en los celulares y computadoras de todos tus clientes en el mundo.
+            </p>
+          </div>
+
+          {/* STATUS BANNER */}
+          <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+            isCloudConfiguredState 
+              ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200' 
+              : 'bg-amber-950/30 border-amber-500/40 text-amber-200'
+          }`}>
+            <div className="flex items-start gap-3.5">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                isCloudConfiguredState ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'
+              }`}>
+                {isCloudConfiguredState ? <Cloud className="w-6 h-6" /> : <WifiOff className="w-6 h-6" />}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${isCloudConfiguredState ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                  <h3 className="font-display text-sm font-bold text-white">
+                    {isCloudConfiguredState ? 'NUBE ACTIVA Y CONECTADA' : 'MODO LOCAL (Sin sincronización multidispositivo)'}
+                  </h3>
+                </div>
+                <p className="text-xs text-[#ccc3d8] mt-1">
+                  {isCloudConfiguredState 
+                    ? `Conectado al proyecto "${firebaseConfigForm.projectId}". Todos los cambios que hagas se sincronizan en vivo con todos tus clientes.` 
+                    : 'Actualmente tus productos solo se guardan en este navegador. Para que otros clientes los vean, ingresa tus claves de Firebase abajo.'
+                  }
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              {isCloudConfiguredState && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleBulkSyncNow}
+                    disabled={isBulkSyncing}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white text-xs font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95 disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isBulkSyncing ? 'animate-spin' : ''}`} />
+                    <span>{isBulkSyncing ? 'Sincronizando...' : `Subir Catálogo Actual (${products.length} prods)`}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDisconnectCloud}
+                    className="px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-300 text-xs font-semibold transition-colors"
+                  >
+                    Desconectar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {bulkSyncResult && (
+            <div className={`p-4 rounded-xl text-xs font-semibold flex items-center gap-2 border ${
+              bulkSyncResult.includes('Éxito') 
+                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+                : 'bg-red-950/40 border-red-500/40 text-red-300'
+            }`}>
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>{bulkSyncResult}</span>
+            </div>
+          )}
+
+          {/* QUICK PASTE SNIPPET BOX */}
+          <div className="p-5 rounded-2xl bg-[#10131a] border border-white/10 flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-white font-bold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#d2bbff]" />
+                Pegado Inteligente: Pega el bloque de configuración de Firebase
+              </label>
+              <span className="text-[11px] text-[#958da1]">Automático</span>
+            </div>
+            <p className="text-[11px] text-[#ccc3d8]">
+              Copia el código que te da Firebase (const firebaseConfig = ...) y pégalo aquí. El sistema detectará las claves automáticamente.
+            </p>
+            <textarea
+              rows={4}
+              value={rawSnippet}
+              onChange={(e) => setRawSnippet(e.target.value)}
+              placeholder={`const firebaseConfig = {\n  apiKey: "AIzaSy...",\n  authDomain: "tu-app.firebaseapp.com",\n  projectId: "tu-app",\n  storageBucket: "tu-app.appspot.com",\n  messagingSenderId: "...",\n  appId: "1:..."\n};`}
+              className="w-full bg-[#191b23] text-xs font-mono text-emerald-300 p-3 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500"
+            />
+            <div className="flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={handleParseSnippet}
+                className="px-4 py-2 rounded-xl bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-xs font-bold flex items-center gap-1.5 transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Interpretar y Rellenar Campos</span>
+              </button>
+              {snippetParseMessage && (
+                <span className={`text-xs ${snippetParseMessage.includes('éxito') ? 'text-emerald-400' : 'text-amber-300'}`}>
+                  {snippetParseMessage}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* CREDENTIALS FORM */}
+          <form onSubmit={handleSaveFirebaseConfig} className="p-5 rounded-2xl bg-[#10131a] border border-white/10 flex flex-col gap-4">
+            <h3 className="font-display text-sm font-bold text-white flex items-center gap-2">
+              <Lock className="w-4 h-4 text-emerald-400" />
+              Campos de Credenciales de Firebase Firestore
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs text-[#958da1] font-semibold block mb-1">
+                  API Key: *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="AIzaSy..."
+                  value={firebaseConfigForm.apiKey}
+                  onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, apiKey: e.target.value })}
+                  className="w-full bg-[#191b23] text-xs font-mono text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-[#958da1] font-semibold block mb-1">
+                  Project ID: *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="gift-corner-lab"
+                  value={firebaseConfigForm.projectId}
+                  onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, projectId: e.target.value })}
+                  className="w-full bg-[#191b23] text-xs font-mono text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-[#958da1] font-semibold block mb-1">
+                  App ID: *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="1:123456789:web:abcdef"
+                  value={firebaseConfigForm.appId}
+                  onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, appId: e.target.value })}
+                  className="w-full bg-[#191b23] text-xs font-mono text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-[#958da1] font-semibold block mb-1">
+                  Auth Domain (Opcional):
+                </label>
+                <input
+                  type="text"
+                  placeholder="gift-corner-lab.firebaseapp.com"
+                  value={firebaseConfigForm.authDomain}
+                  onChange={(e) => setFirebaseConfigForm({ ...firebaseConfigForm, authDomain: e.target.value })}
+                  className="w-full bg-[#191b23] text-xs font-mono text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Test result message */}
+            {cloudTestResult && (
+              <div className={`p-3.5 rounded-xl text-xs font-medium border flex items-center gap-2 ${
+                cloudTestResult.success 
+                  ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300' 
+                  : 'bg-red-950/40 border-red-500/40 text-red-300'
+              }`}>
+                {cloudTestResult.success ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                <span>{cloudTestResult.message}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={handleTestCloudConnection}
+                disabled={isTestingCloud || !firebaseConfigForm.apiKey || !firebaseConfigForm.projectId}
+                className="px-4 py-2.5 rounded-xl bg-[#272a32] hover:bg-[#32353d] text-white text-xs font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isTestingCloud ? 'animate-spin' : ''}`} />
+                <span>{isTestingCloud ? 'Probando conexión...' : 'Probar Conexión'}</span>
+              </button>
+
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:opacity-95 text-white font-display text-xs font-bold flex items-center gap-2 shadow-lg transition-transform active:scale-95"
+              >
+                <Save className="w-4 h-4" />
+                <span>Guardar y Activar Nube</span>
+              </button>
+            </div>
+          </form>
+
+          {/* STEP BY STEP SETUP GUIDE */}
+          <div className="p-6 rounded-2xl bg-[#10131a] border border-white/10 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-sm font-bold text-white flex items-center gap-2">
+                <Globe className="w-4 h-4 text-[#03b5d3]" />
+                Guía Rápida: Cómo crear tu base de datos gratuita en 2 minutos
+              </h3>
+              <a
+                href="https://console.firebase.google.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[#03b5d3] hover:underline flex items-center gap-1 font-semibold"
+              >
+                <span>Ir a Firebase Console</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-[#191b23] border border-white/5 flex flex-col gap-2">
+                <div className="w-7 h-7 rounded-full bg-[#7c3aed]/20 text-[#d2bbff] font-bold text-xs flex items-center justify-center">
+                  1
+                </div>
+                <h4 className="font-display text-xs font-bold text-white">Crear Proyecto</h4>
+                <p className="text-[11px] text-[#ccc3d8] leading-relaxed">
+                  Entra a <strong className="text-white">console.firebase.google.com</strong> con tu cuenta de Google y haz clic en <em>"Agregar proyecto"</em> (por ejemplo: <code className="text-emerald-300">gift-corner-lab</code>).
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#191b23] border border-white/5 flex flex-col gap-2">
+                <div className="w-7 h-7 rounded-full bg-[#03b5d3]/20 text-[#4cd7f6] font-bold text-xs flex items-center justify-center">
+                  2
+                </div>
+                <h4 className="font-display text-xs font-bold text-white">Activar Firestore</h4>
+                <p className="text-[11px] text-[#ccc3d8] leading-relaxed">
+                  En el menú lateral ve a <strong>Compilación ➔ Firestore Database</strong>. Pulsa <em>"Crear base de datos"</em>, selecciona <strong>"Iniciar en modo de prueba"</strong> (para permitir lecturas/escrituras) y presiona Continuar.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-[#191b23] border border-white/5 flex flex-col gap-2">
+                <div className="w-7 h-7 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-xs flex items-center justify-center">
+                  3
+                </div>
+                <h4 className="font-display text-xs font-bold text-white">Copiar Claves</h4>
+                <p className="text-[11px] text-[#ccc3d8] leading-relaxed">
+                  Haz clic en el engranaje ⚙️ <em>Configuración del proyecto</em> ➔ sección <strong>Tus apps</strong> ➔ ícono web <code>&lt;/&gt;</code>. Copia el bloque de código y pégalo arriba en el campo de pegado inteligente.
+                </p>
+              </div>
+            </div>
+
+            {/* Firestore Rules advice */}
+            <div className="p-4 rounded-xl bg-[#191b23]/60 border border-white/5 flex flex-col gap-2 mt-2">
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" /> Reglas de Firestore Recomendadas:
+              </span>
+              <p className="text-[11px] text-[#ccc3d8]">
+                En la pestaña <strong>Reglas</strong> de Firestore en tu consola de Google, asegúrate de tener activada la lectura y escritura para productos y órdenes:
+              </p>
+              <pre className="text-[10px] font-mono bg-[#10131a] p-3 rounded-lg text-emerald-300 overflow-x-auto border border-white/10">
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}`}
+              </pre>
             </div>
           </div>
         </section>

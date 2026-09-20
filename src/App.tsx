@@ -23,6 +23,15 @@ import {
   getCurrentUser, 
   setCurrentUser as persistCurrentUser 
 } from './utils/storage';
+import { 
+  subscribeToProducts, 
+  cloudAddProduct, 
+  cloudDeleteProduct, 
+  cloudUpdateStock, 
+  subscribeToOrders, 
+  cloudSubmitOrder 
+} from './services/cloudDatabase';
+import { isFirebaseConfigured } from './services/firebaseConfig';
 import { sfx } from './utils/audio';
 import { ShoppingBag, X } from 'lucide-react';
 
@@ -66,16 +75,26 @@ export default function App() {
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [isCloudActive, setIsCloudActive] = useState<boolean>(() => isFirebaseConfigured());
 
-  // Save changes to orders
+  // Subscribe to live products from the Cloud (Firebase) or Local fallback
   useEffect(() => {
-    saveOrders(orders);
-  }, [orders]);
+    const unsubscribe = subscribeToProducts((liveProducts) => {
+      setProducts(liveProducts);
+      setIsCloudActive(isFirebaseConfigured());
+    });
+    return () => unsubscribe();
+  }, []);
 
-  // Save changes to products
+  // Subscribe to live orders from the Cloud
   useEffect(() => {
-    saveProducts(products);
-  }, [products]);
+    const unsubscribe = subscribeToOrders((liveOrders) => {
+      if (liveOrders && liveOrders.length > 0) {
+        setOrders(liveOrders);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Auth operations
   const handleLoginSuccess = (user: User) => {
@@ -101,23 +120,26 @@ export default function App() {
     setAuthModalOpen(true);
   };
 
-  // Product operations (Admin)
-  const handleAddProduct = (newProd: Product) => {
-    const updated = [newProd, ...products];
-    setProducts(updated);
-    saveProducts(updated);
+  // Product operations (Admin) - Synchronized across all devices
+  const handleAddProduct = async (newProd: Product) => {
+    setProducts(prev => {
+      const exists = prev.findIndex(p => p.id === newProd.id);
+      if (exists >= 0) {
+        return prev.map(p => p.id === newProd.id ? newProd : p);
+      }
+      return [newProd, ...prev];
+    });
+    await cloudAddProduct(newProd);
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    const updated = products.filter(p => p.id !== productId);
-    setProducts(updated);
-    saveProducts(updated);
+  const handleDeleteProduct = async (productId: string) => {
+    setProducts(prev => prev.filter(p => p.id !== productId));
+    await cloudDeleteProduct(productId);
   };
 
-  const handleUpdateStock = (productId: string, newStock: number) => {
-    const updated = products.map((p) => (p.id === productId ? { ...p, stock: newStock } : p));
-    setProducts(updated);
-    saveProducts(updated);
+  const handleUpdateStock = async (productId: string, newStock: number) => {
+    setProducts(prev => prev.map((p) => (p.id === productId ? { ...p, stock: newStock } : p)));
+    await cloudUpdateStock(productId, newStock);
   };
 
   // Cart operations
@@ -153,7 +175,7 @@ export default function App() {
     setCart([]);
   };
 
-  const handleOrderSuccess = (newOrder: Order) => {
+  const handleOrderSuccess = async (newOrder: Order) => {
     // If a user is logged in, attach their profile email & name
     if (currentUser) {
       newOrder.customerName = currentUser.name;
@@ -161,8 +183,8 @@ export default function App() {
     }
     const updatedOrders = [newOrder, ...orders];
     setOrders(updatedOrders);
-    saveOrders(updatedOrders);
     setCart([]);
+    await cloudSubmitOrder(newOrder);
   };
 
   const handleOpenWhatsApp = () => {
@@ -273,6 +295,7 @@ export default function App() {
             isCreator={currentUser?.role === 'creator'}
             onRequestLoginCreator={() => handleOpenAuth('login')}
             onLogoutCreator={handleLogout}
+            isCloudActive={isCloudActive}
           />
         )}
 
