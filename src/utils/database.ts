@@ -8,9 +8,9 @@ export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
   stripePublicKey: 'pk_test_51GiftCornerLabDemoKey99',
   autoApproveYape: true,
   // PagoEfectivo defaults
-  pagoEfectivoEnabled: false,
-  pagoEfectivoServiceCode: '',
-  pagoEfectivoInstructions: 'Paga con tu código CIP en cualquier agente BCP, Interbank, Banco de la Nación, BBVA, CMAC, o en la app de tu banco.'
+  pagoEfectivoEnabled: true,
+  pagoEfectivoServiceCode: 'GIFT-CORNER-PEN',
+  pagoEfectivoInstructions: 'Paga con tu código CIP en cualquier agente BCP, Interbank, Banco de la Nación, BBVA, CMAC, o desde la app o banca por internet de tu banco.'
 };
 
 const PAYMENT_CONFIG_KEY = 'gift_corner_payment_config';
@@ -22,6 +22,9 @@ export function getPaymentConfig(): PaymentConfig {
     const parsed = { ...DEFAULT_PAYMENT_CONFIG, ...JSON.parse(raw) };
     if (parsed.yapeName === 'Marcelo Aliaga' || !parsed.yapeName) {
       parsed.yapeName = 'Gift Corner Lab';
+    }
+    if (parsed.pagoEfectivoEnabled === undefined) {
+      parsed.pagoEfectivoEnabled = true;
     }
     return parsed;
   } catch (err) {

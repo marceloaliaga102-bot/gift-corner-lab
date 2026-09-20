@@ -392,7 +392,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <span className="text-[10px] opacity-70 font-normal">Presencial</span>
                 </button>
 
-                {paymentConfig.pagoEfectivoEnabled && (
+                {paymentConfig.pagoEfectivoEnabled !== false && (
                   <button
                     type="button"
                     onClick={() => { setPaymentMethod('pagoefectivo'); sfx.playClick(); }}
