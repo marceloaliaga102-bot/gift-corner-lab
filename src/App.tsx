@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Product, ProductCategory, CartItem, Order, AppView, User } from './types';
-import { PRODUCTS, INITIAL_CART_ITEMS } from './data/products';
+import { PRODUCTS } from './data/products';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { CartSidebar } from './components/CartSidebar';
@@ -47,30 +47,8 @@ export default function App() {
   // Persistent User Session & Products
   const [currentUser, setCurrentUserState] = useState<User | null>(() => getCurrentUser());
   const [products, setProducts] = useState<Product[]>(() => getStoredProducts());
-  const [cart, setCart] = useState<CartItem[]>(INITIAL_CART_ITEMS);
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const stored = getStoredOrders();
-    if (stored.length > 0) return stored;
-    return [
-      {
-        id: 'GC-884102',
-        date: '2026-09-18',
-        customerName: 'Cliente',
-        customerEmail: 'cliente@giftcornerlab.com',
-        items: [
-          { product: PRODUCTS[0], quantity: 1 },
-          { product: PRODUCTS[3], quantity: 1 }
-        ],
-        subtotal: 79.80,
-        shipping: 0.00,
-        discount: 15.00,
-        total: 64.80,
-        status: 'Completado',
-        paymentStatus: 'aprobado',
-        shippingAddress: 'Av. Del Parque 450, Dpto 8B'
-      }
-    ];
-  });
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>(() => getStoredOrders());
 
   // Modals state
   const [preview3DOpen, setPreview3DOpen] = useState(false);

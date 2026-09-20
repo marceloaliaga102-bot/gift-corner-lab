@@ -64,6 +64,10 @@ export interface PaymentConfig {
   mercadopagoPublicKey?: string;
   stripePublicKey?: string;
   autoApproveYape?: boolean;
+  // PagoEfectivo integration
+  pagoEfectivoEnabled?: boolean;
+  pagoEfectivoServiceCode?: string;  // Código de servicio (proporcionado por PagoEfectivo)
+  pagoEfectivoInstructions?: string; // Instrucciones personalizadas
 }
 
 export interface Order {
@@ -80,7 +84,8 @@ export interface Order {
   status: 'Completado' | 'En preparación' | 'Enviado' | 'Cancelado';
   shippingAddress?: string;
   pickupLocation?: string;
-  paymentMethod?: 'yape' | 'card' | 'mercadopago' | 'transfer';
+  paymentMethod?: 'yape' | 'efectivo' | 'pagoefectivo';
   yapeOpNumber?: string;
+  pagoEfectivoCip?: string; // CIP code generado para PagoEfectivo
   paymentStatus?: 'aprobado' | 'pendiente' | 'rechazado';
 }

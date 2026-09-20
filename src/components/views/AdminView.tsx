@@ -412,7 +412,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     e.preventDefault();
     savePaymentConfig(paymentConfig);
     sfx.playChime();
-    setConfigSaveSuccess('¡Configuración de Yape y pasarelas de pago guardada con éxito!');
+    setConfigSaveSuccess('¡Configuración de Yape y PagoEfectivo guardada con éxito!');
     setTimeout(() => setConfigSaveSuccess(''), 3000);
   };
 
@@ -689,7 +689,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
           }`}
         >
           <QrCode className="w-4 h-4 shrink-0" />
-          <span>Ajustes de Yape &amp; Pasarelas</span>
+          <span>Yape &amp; PagoEfectivo</span>
         </button>
 
         <button
@@ -1317,10 +1317,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
               <QrCode className="w-4 h-4 text-[#4cd7f6]" /> Configuración de Pagos Generales
             </div>
             <h2 className="font-display text-2xl font-bold text-[#e1e2ec]">
-              Configuración de Yape &amp; Pasarelas Reales
+              Configuración de Yape &amp; PagoEfectivo
             </h2>
             <p className="text-xs text-[#ccc3d8]">
-              Aquí puedes definir el número de Yape, titular y QR que verán todos los clientes al comprar, además de tus claves de pasarelas de pago reales.
+              Aquí puedes definir el número de Yape, titular y QR, además de habilitar y configurar PagoEfectivo como método de pago.
             </p>
           </div>
 
@@ -1383,37 +1383,54 @@ export const AdminView: React.FC<AdminViewProps> = ({
               </div>
             </div>
 
-            {/* REAL PAYMENT GATEWAYS CONFIGURATION */}
-            <div className="p-5 rounded-2xl bg-[#10131a] border border-[#03b5d3]/40 flex flex-col gap-4">
-              <h3 className="font-display text-sm font-bold text-[#4cd7f6] flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-[#4cd7f6]" /> Claves para Pasarelas Reales (Mercado Pago &amp; Tarjetas)
+            {/* PAGOEFECTIVO CONFIGURATION CARD */}
+            <div className="p-5 rounded-2xl bg-[#10131a] border border-orange-500/40 flex flex-col gap-4">
+              <h3 className="font-display text-sm font-bold text-orange-400 flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-orange-400" /> Configuración de PagoEfectivo (CIP)
               </h3>
+
+              <div className="flex items-center gap-3">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={paymentConfig.pagoEfectivoEnabled || false}
+                    onChange={(e) => setPaymentConfigState({ ...paymentConfig, pagoEfectivoEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-[#272a32] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-500"></div>
+                </label>
+                <span className="text-xs text-[#e1e2ec] font-semibold">
+                  {paymentConfig.pagoEfectivoEnabled ? '✅ Habilitado — Los clientes pueden pagar con PagoEfectivo' : '❌ Deshabilitado'}
+                </span>
+              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-[#958da1] font-semibold block mb-1">
-                    Mercado Pago Public Key (Producción / Sandbox):
+                    Código de Servicio PagoEfectivo:
                   </label>
                   <input
                     type="text"
-                    placeholder="APP_USR-..."
-                    value={paymentConfig.mercadopagoPublicKey || ''}
-                    onChange={(e) => setPaymentConfigState({ ...paymentConfig, mercadopagoPublicKey: e.target.value })}
-                    className="w-full bg-[#191b23] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none"
+                    placeholder="Ej. 12345"
+                    value={paymentConfig.pagoEfectivoServiceCode || ''}
+                    onChange={(e) => setPaymentConfigState({ ...paymentConfig, pagoEfectivoServiceCode: e.target.value })}
+                    className="w-full bg-[#191b23] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-orange-500"
                   />
+                  <span className="text-[10px] text-[#958da1] mt-1 block">Proporcionado por PagoEfectivo al registrar tu comercio</span>
                 </div>
 
                 <div>
                   <label className="text-xs text-[#958da1] font-semibold block mb-1">
-                    Stripe / Card Public Key (Opcional):
+                    Instrucciones Personalizadas:
                   </label>
-                  <input
-                    type="text"
-                    placeholder="pk_live_..."
-                    value={paymentConfig.stripePublicKey || ''}
-                    onChange={(e) => setPaymentConfigState({ ...paymentConfig, stripePublicKey: e.target.value })}
-                    className="w-full bg-[#191b23] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none"
+                  <textarea
+                    rows={3}
+                    placeholder="Paga con tu código CIP en cualquier agente bancario..."
+                    value={paymentConfig.pagoEfectivoInstructions || ''}
+                    onChange={(e) => setPaymentConfigState({ ...paymentConfig, pagoEfectivoInstructions: e.target.value })}
+                    className="w-full bg-[#191b23] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-orange-500 resize-none"
                   />
+                  <span className="text-[10px] text-[#958da1] mt-1 block">Este mensaje aparecerá en el checkout cuando el cliente seleccione PagoEfectivo</span>
                 </div>
               </div>
             </div>

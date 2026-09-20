@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { CartItem, Order, ProductDownloadFile, PaymentConfig } from '../../types';
 import { 
-  X, Lock, CheckCircle, ShieldCheck, Mail, MapPin, CreditCard, Sparkles, 
+  X, Lock, CheckCircle, MapPin,
   Download, MessageCircle, ArrowRight, ExternalLink, Zap, Box, Check,
-  QrCode, RefreshCw
+  QrCode, Banknote
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
 import { getPaymentConfig } from '../../utils/database';
@@ -82,17 +82,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [customerPhone, setCustomerPhone] = useState('');
   const [selectedPickupLocation, setSelectedPickupLocation] = useState<string>('');
   
-  // Payment methods: yape, card, mercadopago, transfer
-  const [paymentMethod, setPaymentMethod] = useState<'yape' | 'card' | 'mercadopago' | 'transfer'>('yape');
+  // Payment methods: yape, efectivo
+  const [paymentMethod, setPaymentMethod] = useState<'yape' | 'efectivo' | 'pagoefectivo'>('yape');
   
   // Yape Operation Number input
   const [yapeOpNumber, setYapeOpNumber] = useState('');
 
-  // Card Form Inputs
-  const [cardNumber, setCardNumber] = useState('');
-  const [cardExpiry, setCardExpiry] = useState('');
-  const [cardCvc, setCardCvc] = useState('');
-  const [cardHolder, setCardHolder] = useState('');
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
@@ -159,32 +154,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleProceedPayment = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    // STRICT VALIDATION: YAPE & TRANSFER
-    if (paymentMethod === 'yape' || paymentMethod === 'transfer') {
+    // STRICT VALIDATION: YAPE operation code
+    if (paymentMethod === 'yape') {
       const opCheck = isValidOperationCode(yapeOpNumber);
       if (!opCheck.isValid) {
-        alert(`❌ Compra denegada: ${opCheck.reason}\n\nLos datos ingresados no son reales o están incompletos. Para evitar compras falsas, se requiere un código de comprobante bancario auténtico.`);
-        return;
-      }
-    }
-
-    // STRICT VALIDATION: CARD (LUHN, EXPIRY, CVV, HOLDER)
-    if (paymentMethod === 'card') {
-      const cleanNum = cardNumber.replace(/\D/g, '');
-      if (!isValidLuhn(cleanNum)) {
-        alert('❌ Compra denegada: El número de tarjeta no es válido o no cumple con el algoritmo bancario internacional de control (Luhn). Comprueba los dígitos de tu tarjeta.');
-        return;
-      }
-      if (!isValidExpiry(cardExpiry)) {
-        alert('❌ Compra denegada: La fecha de expiración es inválida o la tarjeta ya se encuentra vencida.');
-        return;
-      }
-      if (!/^\d{3,4}$/.test(cardCvc.trim())) {
-        alert('❌ Compra denegada: El código de seguridad CVV/CVC debe ser de 3 o 4 dígitos numéricos.');
-        return;
-      }
-      if (!cardHolder.trim() || cardHolder.trim().length < 3) {
-        alert('❌ Compra denegada: Debes ingresar el nombre del titular como figura en la tarjeta.');
+        alert(`❌ Compra denegada: ${opCheck.reason}\n\nLos datos ingresados no son reales o están incompletos. Para evitar compras falsas, se requiere un código de comprobante de Yape auténtico.`);
         return;
       }
     }
@@ -221,10 +195,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         total,
         status: 'En preparación',
         paymentMethod,
-        yapeOpNumber: (paymentMethod === 'yape' || paymentMethod === 'transfer') 
-          ? yapeOpNumber.trim() 
-          : (paymentMethod === 'card' ? `CARD-${cardNumber.replace(/\D/g, '').slice(-4)}` : undefined),
-        paymentStatus: 'pendiente', // ALWAYS PENDING UNTIL VERIFIED BY ADMIN
+        yapeOpNumber: paymentMethod === 'yape' ? yapeOpNumber.trim() : undefined,
+        pagoEfectivoCip: paymentMethod === 'pagoefectivo' ? `CIP-${Math.floor(100000 + Math.random() * 900000)}-${Math.floor(10 + Math.random() * 90)}` : undefined,
+        // Efectivo: liberado automáticamente (pago presencial confirmado en el momento)
+        // Yape y PagoEfectivo: pendiente hasta verificación manual del admin
+        paymentStatus: paymentMethod === 'efectivo' ? 'aprobado' : 'pendiente',
         shippingAddress: hasPhysical ? `Punto de Recogida: ${currentPickup}` : undefined
       };
 
@@ -384,62 +359,54 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             )}
 
-            {/* Payment Method Selector */}
+              {/* Payment Method Selector — YAPE, EFECTIVO y PAGOEFECTIVO */}
             <div className="flex flex-col gap-2.5">
               <label className="text-xs text-[#958da1] font-semibold font-mono">Selecciona Método de Pago en Soles (S/.):</label>
               
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 <button
                   type="button"
                   onClick={() => { setPaymentMethod('yape'); sfx.playClick(); }}
-                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
+                  className={`p-3 rounded-xl border text-xs font-bold pixel-btn flex flex-col items-center gap-1.5 transition-all ${
                     paymentMethod === 'yape'
                       ? 'bg-[#7c3aed]/30 border-[#7c3aed] text-white'
                       : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
                   }`}
                 >
-                  <QrCode className="w-5 h-5 text-[#d2bbff]" />
-                  <span>YAPE (Perú)</span>
+                  <QrCode className="w-6 h-6 text-[#d2bbff]" />
+                  <span>YAPE</span>
+                  <span className="text-[10px] opacity-70 font-normal">Pago digital</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => { setPaymentMethod('card'); sfx.playClick(); }}
-                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
-                    paymentMethod === 'card'
-                      ? 'bg-[#7c3aed]/30 border-[#7c3aed] text-white'
+                  onClick={() => { setPaymentMethod('efectivo'); sfx.playClick(); }}
+                  className={`p-3 rounded-xl border text-xs font-bold pixel-btn flex flex-col items-center gap-1.5 transition-all ${
+                    paymentMethod === 'efectivo'
+                      ? 'bg-emerald-600/30 border-emerald-500 text-white'
                       : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
                   }`}
                 >
-                  <CreditCard className="w-5 h-5 text-emerald-400" />
-                  <span>Tarjeta</span>
+                  <Banknote className="w-6 h-6 text-emerald-400" />
+                  <span>Efectivo</span>
+                  <span className="text-[10px] opacity-70 font-normal">Presencial</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => { setPaymentMethod('mercadopago'); sfx.playClick(); }}
-                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
-                    paymentMethod === 'mercadopago'
-                      ? 'bg-[#03b5d3]/30 border-[#03b5d3] text-[#4cd7f6]'
-                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
-                  }`}
-                >
-                  <Sparkles className="w-5 h-5 text-[#4cd7f6]" />
-                  <span>Mercado Pago</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setPaymentMethod('transfer'); sfx.playClick(); }}
-                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
-                    paymentMethod === 'transfer'
-                      ? 'bg-[#c81a42]/30 border-[#c81a42] text-[#ffdedf]'
-                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
-                  }`}
-                >
-                  <ShieldCheck className="w-5 h-5 text-[#ffb2b7]" />
-                  <span>Transferencia</span>
-                </button>
+                {paymentConfig.pagoEfectivoEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => { setPaymentMethod('pagoefectivo'); sfx.playClick(); }}
+                    className={`p-3 rounded-xl border text-xs font-bold pixel-btn flex flex-col items-center gap-1.5 transition-all ${
+                      paymentMethod === 'pagoefectivo'
+                        ? 'bg-orange-600/30 border-orange-500 text-white'
+                        : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
+                    }`}
+                  >
+                    <Banknote className="w-6 h-6 text-orange-400" />
+                    <span>PagoEfectivo</span>
+                    <span className="text-[10px] opacity-70 font-normal">CIP / Código</span>
+                  </button>
+                )}
               </div>
 
               {/* YAPE PAYMENT DETAILS BOX */}
@@ -477,106 +444,55 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
               )}
 
-              {/* CARD FORM BOX */}
-              {paymentMethod === 'card' && (
-                <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col gap-2.5 text-xs animate-fadeIn">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-white flex items-center gap-1.5">
-                      <CreditCard className="w-4 h-4 text-emerald-400" /> Tarjeta de Débito / Crédito
+              {/* EFECTIVO PAYMENT DETAILS BOX */}
+              {paymentMethod === 'efectivo' && (
+                <div className="p-3.5 rounded-xl bg-emerald-950/25 border border-emerald-500/40 flex flex-col gap-2.5 text-xs animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <Banknote className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <strong className="text-white font-semibold">Pago en Efectivo (Presencial)</strong>
+                  </div>
+                  <p className="text-[#ccc3d8] text-[11px] leading-relaxed">
+                    Paga en el momento de la entrega o recogida del producto. El pedido quedará <strong className="text-emerald-400">confirmado y liberado automáticamente</strong> al registrarse, ya que el pago se realiza de forma presencial y directa.
+                  </p>
+                  <div className="p-2.5 rounded-lg bg-emerald-900/30 border border-emerald-500/30 flex items-start gap-2">
+                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                    <span className="text-emerald-300 text-[11px]">
+                      No requiere código de operación. El producto se libera al confirmar el pedido.
                     </span>
-                    <span className="text-[10px] text-emerald-400 font-mono">Pasarela Segura SSL</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Titular de la Tarjeta:</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Nombre como figura en la tarjeta"
-                        value={cardHolder}
-                        onChange={(e) => setCardHolder(e.target.value)}
-                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Número de Tarjeta:</label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={19}
-                        placeholder="4557 •••• •••• 1234"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Fecha Expiración (MM/AA):</label>
-                      <input
-                        type="text"
-                        required
-                        maxLength={5}
-                        placeholder="12/28"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">CVV / CVC:</label>
-                      <input
-                        type="password"
-                        required
-                        maxLength={4}
-                        placeholder="•••"
-                        value={cardCvc}
-                        onChange={(e) => setCardCvc(e.target.value)}
-                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none font-mono"
-                      />
-                    </div>
                   </div>
                 </div>
               )}
 
-              {/* MERCADO PAGO BOX */}
-              {paymentMethod === 'mercadopago' && (
-                <div className="p-3.5 rounded-xl bg-[#03b5d3]/15 border border-[#03b5d3]/40 flex flex-col gap-2 text-xs animate-fadeIn">
+              {/* PAGOEFECTIVO PAYMENT DETAILS BOX */}
+              {paymentMethod === 'pagoefectivo' && (
+                <div className="p-3.5 rounded-xl bg-orange-950/25 border border-orange-500/40 flex flex-col gap-2.5 text-xs animate-fadeIn">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#4cd7f6]" />
-                    <strong className="text-white font-semibold">Mercado Pago Perú (Acreditación Inmediata)</strong>
+                    <Banknote className="w-5 h-5 text-orange-400 shrink-0" />
+                    <strong className="text-white font-semibold">PagoEfectivo — Paga con Código CIP</strong>
                   </div>
-                  <p className="text-[#ccc3d8] text-[11px]">
-                    Acepta tarjetas de todos los bancos en Soles, PagoEfectivo y saldo en cuenta. Al presionar pagar se validará la transacción.
+
+                  <div className="p-3 rounded-lg bg-orange-900/20 border border-orange-500/30 text-center">
+                    <p className="text-[10px] text-orange-300 uppercase font-bold mb-1">Tu Código CIP de Pago</p>
+                    <p className="text-2xl font-mono font-bold text-white tracking-widest">
+                      {`CIP-${Math.floor(100000 + Math.random() * 900000)}-${Math.floor(10 + Math.random() * 90)}`}
+                    </p>
+                    <p className="text-[10px] text-orange-200 mt-1">Monto: <strong className="text-white font-mono">S/. {total.toFixed(2)}</strong></p>
+                  </div>
+
+                  <p className="text-[#ccc3d8] text-[11px] leading-relaxed">
+                    {paymentConfig.pagoEfectivoInstructions || 'Paga con tu código CIP en cualquier agente BCP, Interbank, Banco de la Nación, BBVA, CMAC, o en la app de tu banco.'}
                   </p>
+
+                  <div className="p-2.5 rounded-lg bg-orange-900/30 border border-orange-500/30 flex items-start gap-2">
+                    <Lock className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+                    <span className="text-orange-300 text-[11px]">
+                      Tu pedido quedará <strong>pendiente</strong> hasta que el pago sea verificado por el administrador. Plazo máximo: 24 horas.
+                    </span>
+                  </div>
                 </div>
               )}
 
-              {/* TRANSFER BOX */}
-              {paymentMethod === 'transfer' && (
-                <div className="p-3.5 rounded-xl bg-[#c81a42]/15 border border-[#c81a42]/40 flex flex-col gap-2 text-xs animate-fadeIn">
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#ffb2b7]" />
-                    <strong className="text-white font-semibold">Transferencia Bancaria BCP / Interbank</strong>
-                  </div>
-                  <p className="text-[#ccc3d8] text-[11px] font-mono">
-                    BCP Soles: 191-9482019-0-42 • CCI: 002-191-009482019042-55 (Titular: Gift Corner Lab)
-                  </p>
-                  <div className="mt-2">
-                    <label className="text-[11px] text-[#ffdedf] font-bold block mb-1">
-                      Ingresa el Número de Operación de la Transferencia: *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Ej. 84920194"
-                      value={yapeOpNumber}
-                      onChange={(e) => setYapeOpNumber(e.target.value)}
-                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-[#c81a42] focus:outline-none font-mono"
-                    />
-                  </div>
-                </div>
-              )}
+              {/* TRANSFER/MERCADOPAGO boxes removed — solo Yape, Efectivo y PagoEfectivo */}
             </div>
 
             {/* Resumen de Compra en Soles */}
