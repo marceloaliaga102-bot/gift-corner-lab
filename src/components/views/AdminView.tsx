@@ -24,8 +24,10 @@ import {
 } from '../../services/firebaseConfig';
 import { 
   cloudBulkUploadProducts, 
-  testCloudConnection 
+  testCloudConnection,
+  cloudSubmitOrder
 } from '../../services/cloudDatabase';
+import { saveOrders } from '../../utils/storage';
 
 interface AdminViewProps {
   products: Product[];
@@ -50,10 +52,30 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onLogoutCreator,
   isCloudActive = false
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'payment_config' | 'database' | 'cloud_sync'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'payment_config' | 'database' | 'cloud_sync'>('products');
+  const [ordersList, setOrdersList] = useState<Order[]>(orders);
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [tempStock, setTempStock] = useState<number>(0);
+
+  useEffect(() => {
+    setOrdersList(orders);
+  }, [orders]);
+
+  const generateNewCode = (modality: 'virtual' | 'fisico') => {
+    const prefix = modality === 'virtual' ? 'VIR' : 'FIS';
+    const rand = Math.floor(100 + Math.random() * 900);
+    return `GCL-${prefix}-${rand}`;
+  };
+
+  const handleApprovePayment = async (orderId: string) => {
+    const updated = ordersList.map(o => o.id === orderId ? { ...o, paymentStatus: 'aprobado' as const } : o);
+    setOrdersList(updated);
+    saveOrders(updated);
+    const found = updated.find(o => o.id === orderId);
+    if (found) await cloudSubmitOrder(found);
+    sfx.playChime();
+  };
 
   // Cloud Synchronization State
   const [isCloudConfiguredState, setIsCloudConfiguredState] = useState<boolean>(() => isFirebaseConfigured());
@@ -76,6 +98,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   // Cloud & Edit handlers
   const handleStartEditProduct = (p: Product) => {
     setEditingProduct(p);
+    setCode(p.code || generateNewCode(p.productType || (p.category === 'virtuales' ? 'virtual' : 'fisico')));
     setName(p.name);
     setCategory(p.category === 'porquesi' ? 'porquesi' : p.category);
     setProductModality(p.productType || (p.category === 'virtuales' ? 'virtual' : 'fisico'));
@@ -101,6 +124,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const handleCancelForm = () => {
     setEditingProduct(null);
     setIsCreatingProduct(false);
+    setCode('');
     setName('');
     setDescription('');
     setFullDetails('');
@@ -207,10 +231,11 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [productModality, setProductModality] = useState<'virtual' | 'fisico'>('virtual');
+  const [code, setCode] = useState(() => generateNewCode('virtual'));
   const [name, setName] = useState('');
   const [category, setCategory] = useState<'fisicos' | 'virtuales' | 'porquesi'>('virtuales');
-  const [price, setPrice] = useState<string>('9.99');
-  const [originalPrice, setOriginalPrice] = useState<string>('14.99');
+  const [price, setPrice] = useState<string>('29.90');
+  const [originalPrice, setOriginalPrice] = useState<string>('45.00');
   const [discountBadge, setDiscountBadge] = useState('-33% OFF');
   const [badgeLabel, setBadgeLabel] = useState('⚡ PRODUCTO VIRTUAL');
   const [secondaryBadge, setSecondaryBadge] = useState('Descarga Inmediata');
@@ -408,6 +433,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     const newProd: Product = {
       id: editingProduct ? editingProduct.id : `prod-${Date.now()}`,
+      code: code.trim().toUpperCase() || generateNewCode(productModality),
       name: name.trim(),
       category: category,
       productType: productModality,
@@ -435,6 +461,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setFormSuccess(editingProduct ? '¡Producto actualizado con éxito y sincronizado en el catálogo!' : '¡Producto creado con éxito y publicado en el catálogo!');
 
     // Reset Form
+    setCode(generateNewCode(productModality));
     setName('');
     setDescription('');
     setFullDetails('');
@@ -578,6 +605,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
         <button
           type="button"
+          onClick={() => { setActiveTab('orders'); sfx.playClick(); }}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+            activeTab === 'orders'
+              ? 'bg-[#7c3aed] text-white shadow-md'
+              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+          }`}
+        >
+          <Box className="w-4 h-4" />
+          <span>Órdenes &amp; Pagos ({ordersList.length})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => { setActiveTab('cloud_sync'); sfx.playClick(); }}
           className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
             activeTab === 'cloud_sync'
@@ -700,18 +740,44 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Column 1: Basic Information */}
                   <div className="flex flex-col gap-4">
-                    <div>
-                      <label className="text-xs text-[#958da1] font-semibold block mb-1">
-                        Nombre del Producto: *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        placeholder={productModality === 'virtual' ? 'Ej. Carta Digital 3D & Cuponera Interactiva' : 'Ej. Lámpara Acrílica Grabada en Madera'}
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-[#10131a] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed]"
-                      />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="text-xs text-[#958da1] font-semibold block mb-1">
+                          Nombre del Producto: *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder={productModality === 'virtual' ? 'Ej. Carta Digital 3D & Cuponera Interactiva' : 'Ej. Lámpara Acrílica Grabada en Madera'}
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="w-full bg-[#10131a] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-[#4cd7f6] font-semibold block mb-1 font-mono">
+                          Código Único (SKU): *
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="text"
+                            required
+                            placeholder="GCL-V101"
+                            value={code}
+                            onChange={(e) => setCode(e.target.value.toUpperCase())}
+                            className="w-full bg-[#10131a] text-xs text-[#4cd7f6] font-mono font-bold px-2.5 py-2.5 rounded-xl border border-[#4cd7f6]/40 focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCode(generateNewCode(productModality))}
+                            className="px-2 py-1 bg-[#272a32] hover:bg-[#32353d] text-[#4cd7f6] text-[10px] font-mono font-bold rounded-lg border border-white/10 shrink-0 pixel-btn"
+                            title="Generar código automático"
+                          >
+                            Auto
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -737,16 +803,16 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
                       <div>
                         <label className="text-xs text-[#958da1] font-semibold block mb-1">
-                          Precio Oferta ($): *
+                          Precio Oferta (S/.): *
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           required
-                          placeholder="9.99"
+                          placeholder="29.90"
                           value={price}
                           onChange={(e) => setPrice(e.target.value)}
-                          className="w-full bg-[#10131a] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed]"
+                          className="w-full bg-[#10131a] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed] font-mono"
                         />
                       </div>
                     </div>
@@ -754,15 +820,15 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="text-xs text-[#958da1] font-semibold block mb-1">
-                          Precio Normal (Opcional $):
+                          Precio Normal (Opcional S/.):
                         </label>
                         <input
                           type="number"
                           step="0.01"
-                          placeholder="14.99"
+                          placeholder="45.00"
                           value={originalPrice}
                           onChange={(e) => setOriginalPrice(e.target.value)}
-                          className="w-full bg-[#10131a] text-xs text-white px-3.5 py-2 rounded-xl border border-white/10 focus:outline-none"
+                          className="w-full bg-[#10131a] text-xs text-white px-3.5 py-2 rounded-xl border border-white/10 focus:outline-none font-mono"
                         />
                       </div>
 
@@ -910,6 +976,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
               <table className="w-full text-left text-xs text-[#ccc3d8]">
                 <thead className="text-[11px] text-[#958da1] uppercase border-b border-white/10">
                   <tr>
+                    <th className="py-3 px-2">Código</th>
                     <th className="py-3 px-2">Producto</th>
                     <th className="py-3 px-2">Tipo</th>
                     <th className="py-3 px-2">Precio</th>
@@ -920,6 +987,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 <tbody className="divide-y divide-white/5">
                   {products.map((p) => (
                     <tr key={p.id} className="hover:bg-white/5 transition-colors">
+                      <td className="py-3 px-2 font-mono text-[#4cd7f6] font-bold">
+                        {p.code || 'GCL-00'}
+                      </td>
                       <td className="py-3 px-2 flex items-center gap-3 font-semibold text-white">
                         <img src={p.thumbnailUrl || p.imageUrl} alt={p.name} className="w-10 h-10 rounded-lg object-cover" />
                         <span>{p.name}</span>
@@ -929,7 +999,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           {p.category.toUpperCase()}
                         </span>
                       </td>
-                      <td className="py-3 px-2 font-mono text-white">${p.price.toFixed(2)}</td>
+                      <td className="py-3 px-2 font-mono text-white">S/. {p.price.toFixed(2)}</td>
                       <td className="py-3 px-2">
                         {p.stock !== undefined ? (
                           editingStockId === p.id ? (
@@ -982,6 +1052,102 @@ export const AdminView: React.FC<AdminViewProps> = ({
             </div>
           </div>
         </>
+      )}
+
+      {/* ================= TAB: ORDERS & PAYMENTS ================= */}
+      {activeTab === 'orders' && (
+        <section className="p-6 rounded-3xl bg-[#191b23] border border-white/10 shadow-2xl flex flex-col gap-6 animate-fadeIn pixel-border">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-[#7c3aed]/20 text-[#d2bbff] text-[10px] pixel-badge uppercase mb-2">
+                <Box className="w-3.5 h-3.5 text-[#4cd7f6]" /> Control de Pedidos &amp; Verificación
+              </div>
+              <h2 className="font-display text-xl sm:text-2xl font-bold text-white">
+                Pedidos de Clientes ({ordersList.length})
+              </h2>
+              <p className="text-xs text-[#ccc3d8]">
+                Revisa los pedidos recibidos, pagos en Soles y libera descargas virtuales pendientes.
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[#10131a] border border-white/10 text-right">
+              <span className="text-[10px] text-[#958da1] block uppercase font-mono">Total Facturado</span>
+              <span className="font-display text-lg sm:text-xl font-bold text-emerald-400">
+                S/. {ordersList.reduce((acc, o) => acc + (o.total || 0), 0).toFixed(2)}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-[#ccc3d8]">
+              <thead className="text-[11px] text-[#958da1] uppercase border-b border-white/10 font-mono">
+                <tr>
+                  <th className="py-3 px-2">ID Pedido</th>
+                  <th className="py-3 px-2">Fecha</th>
+                  <th className="py-3 px-2">Cliente</th>
+                  <th className="py-3 px-2">Productos &amp; Códigos</th>
+                  <th className="py-3 px-2">Total</th>
+                  <th className="py-3 px-2">Método</th>
+                  <th className="py-3 px-2">Estado Pago</th>
+                  <th className="py-3 px-2 text-right">Acción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {ordersList.map((ord) => (
+                  <tr key={ord.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-3 px-2 font-mono font-bold text-[#d2bbff]">{ord.id}</td>
+                    <td className="py-3 px-2 font-mono text-[11px]">{ord.date}</td>
+                    <td className="py-3 px-2">
+                      <strong className="text-white block">{ord.customerName}</strong>
+                      <span className="text-[10px] text-[#958da1] font-mono">{ord.customerEmail}</span>
+                    </td>
+                    <td className="py-3 px-2">
+                      <div className="flex flex-col gap-1">
+                        {ord.items.map((it, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5 text-[11px]">
+                            <span className="px-1.5 py-0.2 rounded bg-black/60 text-[#4cd7f6] font-mono text-[9px] border border-[#4cd7f6]/40">
+                              {it.product.code || 'GCL-00'}
+                            </span>
+                            <span className="text-white">{it.product.name}</span>
+                            <span className="text-[#958da1]">x{it.quantity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 font-mono font-bold text-white">S/. {ord.total.toFixed(2)}</td>
+                    <td className="py-3 px-2">
+                      <span className="uppercase font-mono text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white">
+                        {ord.paymentMethod || 'YAPE'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2">
+                      <span className={`px-2 py-0.5 rounded text-[8px] pixel-badge ${
+                        ord.paymentStatus === 'aprobado' 
+                          ? 'bg-emerald-500/20 text-emerald-400' 
+                          : 'bg-amber-500/20 text-amber-300'
+                      }`}>
+                        {ord.paymentStatus === 'aprobado' ? 'Aprobado (Liberado)' : 'Pendiente (Retenido)'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-right">
+                      {ord.paymentStatus !== 'aprobado' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleApprovePayment(ord.id)}
+                          className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold pixel-btn transition-all flex items-center gap-1 ml-auto"
+                        >
+                          <Check className="w-3 h-3" /> Aprobar y Liberar
+                        </button>
+                      ) : (
+                        <span className="text-emerald-400 text-[10px] font-mono">Liberado</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       )}
 
       {/* ================= TAB 2: YAPE & PAYMENT CONFIGURATION ================= */}

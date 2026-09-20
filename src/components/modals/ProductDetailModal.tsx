@@ -68,45 +68,48 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           {/* Details & Specs */}
           <div className="md:col-span-6 flex flex-col gap-4">
             <div>
-              <div className="flex items-center gap-2 mb-1.5">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="px-2 py-0.5 rounded bg-black/80 text-[#4cd7f6] border border-[#4cd7f6]/50 font-mono text-xs font-bold">
+                  COD: {product.code || `GCL-${product.id.slice(0, 4).toUpperCase()}`}
+                </span>
                 {isVirtual && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-display font-bold bg-[#03b5d3]/20 text-[#4cd7f6] flex items-center gap-1">
-                    <Zap className="w-3 h-3" /> {product.badgeLabel}
+                  <span className="px-2 py-0.5 rounded text-[9px] pixel-badge bg-[#03b5d3] text-[#001f26] flex items-center gap-1">
+                    <Zap className="w-2.5 h-2.5" /> {product.badgeLabel}
                   </span>
                 )}
                 {product.category === 'fisicos' && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-display font-bold bg-[#32353d] text-[#4cd7f6] flex items-center gap-1">
-                    <Box className="w-3 h-3" /> {product.badgeLabel}
+                  <span className="px-2 py-0.5 rounded text-[9px] pixel-badge bg-[#272a32] text-[#4cd7f6] flex items-center gap-1 border border-[#4cd7f6]/40">
+                    <Box className="w-2.5 h-2.5" /> {product.badgeLabel}
                   </span>
                 )}
                 {isPorqueSi && (
-                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-display font-bold bg-[#ffb2b7] text-[#67001b] flex items-center gap-1">
-                    <Sparkles className="w-3 h-3" /> {product.badgeLabel}
+                  <span className="px-2 py-0.5 rounded text-[9px] pixel-badge bg-[#ffb2b7] text-[#67001b] flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5" /> {product.badgeLabel}
                   </span>
                 )}
                 {product.secondaryBadge && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#272a32] text-[#ccc3d8]">
+                  <span className="px-2 py-0.5 rounded text-[9px] pixel-badge bg-[#272a32] text-[#ccc3d8]">
                     {product.secondaryBadge}
                   </span>
                 )}
               </div>
 
-              <h2 className="font-display text-xl sm:text-2xl font-bold text-[#e1e2ec] leading-tight">
+              <h2 className="font-display text-base sm:text-xl font-bold text-white leading-tight">
                 {product.name}
               </h2>
 
               <div className="flex items-baseline gap-2 mt-2">
-                <span className={`font-display text-2xl font-extrabold ${
-                  isPorqueSi ? 'text-[#ffb2b7]' : 'text-[#e1e2ec]'
+                <span className={`font-display text-xl sm:text-2xl font-extrabold ${
+                  isPorqueSi ? 'text-[#ffb2b7]' : 'text-white'
                 }`}>
-                  ${product.price.toFixed(2)}
+                  S/. {product.price.toFixed(2)}
                 </span>
                 {product.originalPrice && (
-                  <span className="text-xs text-[#958da1] line-through">
-                    ${product.originalPrice.toFixed(2)}
+                  <span className="text-xs text-[#958da1] line-through font-mono">
+                    S/. {product.originalPrice.toFixed(2)}
                   </span>
                 )}
-                <span className="text-xs text-[#4cd7f6] flex items-center gap-1 ml-2">
+                <span className="text-xs text-[#4cd7f6] flex items-center gap-1 ml-2 font-mono">
                   <Clock className="w-3 h-3" /> {product.deliveryInfo}
                 </span>
               </div>
@@ -159,7 +162,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             {/* Downloadable Attachment Notice if available (Virtual) */}
             {product.downloadFile && (
-              <div className="p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between text-xs">
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5">
                   <FileCode className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
@@ -167,7 +170,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       Entrega Digital Instantánea ({product.downloadFile.name})
                     </span>
                     <span className="text-[10px] text-emerald-300">
-                      Podrás descargarlo directamente en tu cuenta tras la compra.
+                      Podrás descargarlo directamente en tu cuenta tras confirmar el pago.
                     </span>
                   </div>
                 </div>
@@ -179,18 +182,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             {/* Physical Pickup Locations & WhatsApp coordination notice */}
             {isPhysical && (
-              <div className="p-3.5 rounded-2xl bg-[#03b5d3]/10 border border-[#03b5d3]/30 flex flex-col gap-2 text-xs">
+              <div className="p-3.5 rounded-xl bg-[#03b5d3]/10 border border-[#03b5d3]/30 flex flex-col gap-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-[#4cd7f6] flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-[#4cd7f6]" /> Puntos de Recogida de Referencia
+                  <span className="font-bold text-[#4cd7f6] flex items-center gap-1.5 font-mono">
+                    <MapPin className="w-4 h-4 text-[#4cd7f6]" /> Entrega Física Coordinada
                   </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#03b5d3]/20 text-[#4cd7f6] font-semibold">
-                    Entrega Presencial
+                  <span className="text-[9px] pixel-badge px-2 py-0.5 rounded bg-[#03b5d3]/20 text-[#4cd7f6]">
+                    Presencial
                   </span>
                 </div>
                 
                 <p className="text-[11px] text-[#ccc3d8] leading-tight">
-                  Se coordina personalmente por WhatsApp con Marcelo &amp; Angely tras verificar el pago. Puntos disponibles para acordar:
+                  Se coordina por WhatsApp indicando el código único: <strong className="text-[#4cd7f6] font-mono">{product.code}</strong>. Puntos de encuentro disponibles:
                 </p>
 
                 <div className="flex flex-wrap gap-1.5 pt-1">
@@ -205,10 +208,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       <MapPin className="w-3 h-3 text-[#4cd7f6]" /> {loc}
                     </span>
                   ))}
-                </div>
-
-                <div className="flex items-center gap-1.5 text-[11px] text-[#25D366] font-semibold pt-1">
-                  <MessageCircle className="w-3.5 h-3.5" /> Reenvío automático a WhatsApp con los datos de tu pedido al pagar.
                 </div>
               </div>
             )}
@@ -226,8 +225,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               ))}
             </div>
 
-            {/* Action button */}
-            <div className="pt-4 flex items-center gap-3">
+            {/* Action buttons */}
+            <div className="pt-4 flex flex-col sm:flex-row items-center gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -235,7 +234,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   onAddToCart(product);
                   onClose();
                 }}
-                className={`flex-1 py-3 px-4 rounded-xl font-display text-xs font-bold flex items-center justify-center gap-2 shadow-lg transition-all ${
+                className={`w-full flex-1 py-3 px-4 rounded-xl font-display text-xs font-bold pixel-btn flex items-center justify-center gap-2 shadow-lg transition-all ${
                   isPorqueSi
                     ? 'bg-[#ffb2b7] hover:bg-white text-[#67001b]'
                     : isVirtual
@@ -246,6 +245,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <ShoppingCart className="w-4 h-4" />
                 <span>{isPorqueSi ? '¡Lo Quiero!' : 'Añadir al Carrito'}</span>
               </button>
+
+              {isPhysical && (
+                <a
+                  href={`https://wa.me/51921617882?text=${encodeURIComponent(`¡Hola! Quiero pedir el siguiente producto:\n📦 ${product.name}\n🏷️ Código: ${product.code}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => sfx.playChime()}
+                  className="w-full sm:w-auto py-3 px-4 rounded-xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:opacity-95 text-white font-display text-xs font-bold pixel-btn flex items-center justify-center gap-2 shadow-md transition-all"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Pedir por WhatsApp</span>
+                </a>
+              )}
             </div>
           </div>
         </div>

@@ -3,11 +3,12 @@ import { Product, CartItem } from '../types';
 export const PRODUCTS: Product[] = [
   {
     id: 'cuponera-amor-3d',
+    code: 'GCL-VIR-01',
     name: 'Cuponera de Amor Interactiva & Carta Digital 3D',
     category: 'virtuales',
     productType: 'virtual',
-    price: 9.99,
-    originalPrice: 14.99,
+    price: 29.90,
+    originalPrice: 45.00,
     discountBadge: '-33% OFF',
     badgeLabel: '⚡ PRODUCTO VIRTUAL',
     badgeType: 'virtual',
@@ -58,10 +59,11 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'lampara-acrilica-spotify',
+    code: 'GCL-FIS-02',
     name: 'Lámpara Acrílica Personalizada Spotify',
     category: 'fisicos',
     productType: 'fisico',
-    price: 28.50,
+    price: 79.90,
     badgeLabel: '📦 PRODUCTO FÍSICO',
     badgeType: 'fisico',
     secondaryBadge: 'Stock: 14 uds.',
@@ -87,10 +89,11 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'piedra-mascota-sombrerito',
+    code: 'GCL-PQS-03',
     name: 'Piedra Mascota con Certificado & Sombrerito',
     category: 'porquesi',
     productType: 'fisico',
-    price: 7.00,
+    price: 19.90,
     badgeLabel: '🦄 PORQUE SÍ',
     badgeType: 'porquesi',
     secondaryBadge: 'Sin propósito útil',
@@ -114,11 +117,12 @@ export const PRODUCTS: Product[] = [
   },
   {
     id: 'pagina-web-conmemorativa',
+    code: 'GCL-VIR-04',
     name: 'Página Web Conmemorativa Personalizada',
     category: 'virtuales',
     productType: 'virtual',
-    price: 19.99,
-    originalPrice: 35.00,
+    price: 49.90,
+    originalPrice: 79.00,
     badgeLabel: '⚡ PRODUCTO VIRTUAL',
     badgeType: 'virtual',
     secondaryBadge: 'Hosting 1 año inc.',
@@ -162,10 +166,11 @@ h1 { color: #38bdf8; }
   },
   {
     id: 'caja-explosiva-dulces-polaroid',
+    code: 'GCL-FIS-05',
     name: 'Caja Explosiva Sorpresa Dulces & Polaroid',
     category: 'fisicos',
     productType: 'fisico',
-    price: 34.00,
+    price: 89.90,
     badgeLabel: '📦 PRODUCTO FÍSICO',
     badgeType: 'fisico',
     secondaryBadge: '12 Fotos Incluidas',
@@ -190,10 +195,11 @@ h1 { color: #38bdf8; }
   },
   {
     id: 'boton-panico-miau',
+    code: 'GCL-PQS-06',
     name: "Botón de Pánico que solo dice 'Miau'",
     category: 'porquesi',
     productType: 'fisico',
-    price: 6.50,
+    price: 24.90,
     badgeLabel: '🦄 PORQUE SÍ',
     badgeType: 'porquesi',
     secondaryBadge: 'Baterías AAA incluidas',
@@ -217,10 +223,11 @@ h1 { color: #38bdf8; }
   },
   {
     id: 'pack-stickers-instagram',
+    code: 'GCL-VIR-07',
     name: 'Pack 100 Stickers & Filtros Instagram',
     category: 'virtuales',
     productType: 'virtual',
-    price: 4.99,
+    price: 15.00,
     badgeLabel: '⚡ PRODUCTO VIRTUAL',
     badgeType: 'virtual',
     imageUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBP7HJojDTtKjGOeqNUcuYj-qEP4XbtxqXyePPw7wqiW8zvBFekN52qBieucD3eDCgoZSDvSeiSX-vX80cX72BUCbLDKbLkn8ucFQ3ISeYmfr1ueRfUw9i8sfFoEvp6w3SFE_gpAi3ASRPbOl5Wlq7aRnVfOKx_oQF8qoAzJv0ny3Cfs1ccOedxhfmfC0iYSGcl7waZ3TMbcMknA3GGfaT15LpkGYYs1Tzrt2N41upfvIeofYXjNaQWTQ',
@@ -245,11 +252,12 @@ h1 { color: #38bdf8; }
   },
   {
     id: 'mini-proyector-constelaciones',
+    code: 'GCL-FIS-08',
     name: 'Mini Proyector Portátil Constelaciones USB',
     category: 'fisicos',
     productType: 'fisico',
-    price: 42.00,
-    originalPrice: 55.00,
+    price: 119.00,
+    originalPrice: 149.00,
     badgeLabel: '📦 PRODUCTO FÍSICO',
     badgeType: 'fisico',
     secondaryBadge: 'Oferta Flash',
@@ -276,8 +284,7 @@ h1 { color: #38bdf8; }
 ];
 
 export const INITIAL_CART_ITEMS: CartItem[] = [
-  { product: PRODUCTS[0], quantity: 1 }, // Cuponera de Amor 3D ($9.99 - Virtual)
-  { product: PRODUCTS[1], quantity: 1 }  // Lámpara Spotify ($28.50 - Físico)
+  { product: PRODUCTS[0], quantity: 1 } // Cuponera de Amor 3D (Virtual)
 ];
 
 export const LOGO_URL = 'https://lh3.googleusercontent.com/aida/AEtjO1WxWi_NSsuTNnxr-UlDMCa2UmLMPwOBdPSB7sqKuILYhzx5cPbeEjwQA-9XSRkuE16ub49pAz4ZqRok9N1aCv7YnAfdR5sTtsDSUWOQI8-Xfq3PBE_pgSETxahI1u44vqPDN6JrcQ10YWHAg8ncOE0tl5lXIbv_TQc0wdiaTmHsSxAQ6yxcQTpbYuD7d_-z6sGiSKxkjeGZnliBGlJZiXAiSgZuH0R_0_IyYC65WCbpZ2SB6SdYApgCGQQ';

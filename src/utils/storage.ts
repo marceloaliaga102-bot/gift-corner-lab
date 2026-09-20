@@ -85,7 +85,16 @@ export const getStoredProducts = (): Product[] => {
     }
     const parsed = JSON.parse(saved);
     if (Array.isArray(parsed)) {
-      return parsed;
+      return parsed.map((p, idx) => {
+        if (!p.code) {
+          const matched = PRODUCTS.find(dp => dp.id === p.id);
+          return {
+            ...p,
+            code: matched?.code || `GCL-${p.category === 'virtuales' ? 'VIR' : 'FIS'}-${String(idx + 1).padStart(2, '0')}`
+          };
+        }
+        return p;
+      });
     }
     return PRODUCTS;
   } catch {

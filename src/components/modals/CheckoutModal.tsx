@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CartItem, Order, ProductDownloadFile, PaymentConfig } from '../../types';
 import { 
   X, Lock, CheckCircle, ShieldCheck, Mail, MapPin, CreditCard, Sparkles, 
-  Download, MessageCircle, AlertTriangle, ArrowRight, ExternalLink, Zap, Box, Check,
+  Download, MessageCircle, ArrowRight, ExternalLink, Zap, Box, Check,
   QrCode, RefreshCw
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
@@ -41,6 +41,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
+  const [activeItemsSnapshot, setActiveItemsSnapshot] = useState<CartItem[]>([]);
 
   // Pre-payment physical notice state
   const [showPhysicalNoticeModal, setShowPhysicalNoticeModal] = useState(false);
@@ -49,16 +50,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setPaymentConfig(getPaymentConfig());
+      if (items.length > 0) {
+        setActiveItemsSnapshot([...items]);
+      }
+    } else {
+      setCompletedOrder(null);
+      setHasConfirmedPhysicalNotice(false);
     }
-  }, [isOpen]);
+  }, [isOpen, items]);
 
   if (!isOpen) return null;
 
+  // Items source: use active items snapshot if cart gets cleared on order success
+  const currentItems = completedOrder ? completedOrder.items : (items.length > 0 ? items : activeItemsSnapshot);
+
   // Separate virtual and physical items
-  const physicalItems = items.filter(
+  const physicalItems = currentItems.filter(
     item => item.product.productType === 'fisico' || item.product.category === 'fisicos' || item.product.category === 'porquesi'
   );
-  const virtualItems = items.filter(
+  const virtualItems = currentItems.filter(
     item => item.product.productType === 'virtual' || item.product.category === 'virtuales' || Boolean(item.product.downloadFile)
   );
 
@@ -78,11 +88,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const currentPickup = selectedPickupLocation || allPickupLocations[0] || 'Plaza Central / Parque Principal';
 
-  const subtotal = items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-  const discount = items.length > 0 ? 5.00 : 0.00;
-  const shipping = 0.00;
+  const subtotal = currentItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  const discount = currentItems.length > 0 ? 15.00 : 0.00;
+  const shipping = hasPhysical ? 10.00 : 0.00;
   const total = Math.max(0, subtotal + shipping - discount);
-  const totalPen = (total * 3.75).toFixed(2); // Approximate PEN currency conversion
 
   // Trigger payment submission
   const handleProceedPayment = (e?: React.FormEvent) => {
@@ -106,6 +115,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setIsProcessing(true);
     setShowPhysicalNoticeModal(false);
 
+    // Save snapshot of current items before cart clears
+    const orderItems = [...currentItems];
+
     setTimeout(() => {
       sfx.playChime();
       const newOrder: Order = {
@@ -115,7 +127,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         customerEmail,
         customerPhone: hasPhysical ? customerPhone : undefined,
         pickupLocation: hasPhysical ? currentPickup : undefined,
-        items: [...items],
+        items: orderItems,
         subtotal,
         shipping,
         discount,
@@ -133,25 +145,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }, 1200);
   };
 
-  // Generate WhatsApp link for physical products
+  // Generate WhatsApp link for physical products (ONLY requested products with their unique code, no sensitive data)
   const generateWhatsAppUrl = (order: Order) => {
-    const physicalItemNames = order.items
+    const physicalItemsList = (order.items || [])
       .filter(it => it.product.productType === 'fisico' || it.product.category === 'fisicos' || it.product.category === 'porquesi')
-      .map(it => `${it.product.name} (x${it.quantity})`)
-      .join(', ');
+      .map(it => `• ${it.product.name} (Código: ${it.product.code || 'GCL-00'})${it.quantity > 1 ? ` x${it.quantity}` : ''}`)
+      .join('\n');
 
-    const text = `¡Hola Marcelo y Angely! 👋
-Acabo de pagar mi pedido #${order.id} en Gift Corner Lab.
-
-📦 *Producto(s) Físico(s)*: ${physicalItemNames}
-💰 *Total pagado*: $${order.total.toFixed(2)} (${totalPen} PEN)
-💳 *Método de pago*: ${paymentMethod.toUpperCase()} ${order.yapeOpNumber ? `(Op: ${order.yapeOpNumber})` : ''}
-👤 *Cliente*: ${order.customerName}
-📞 *Mi teléfono*: ${customerPhone}
-📍 *Punto de recogida de referencia*: ${currentPickup}
-
-Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto de encuentro. ¡Muchas gracias!`;
-
+    const text = `¡Hola! Quiero pedir el siguiente producto:\n${physicalItemsList}`;
     const waPhoneClean = paymentConfig.yapePhone.replace(/\D/g, '') || '51921617882';
     return `https://wa.me/${waPhoneClean}?text=${encodeURIComponent(text)}`;
   };
@@ -165,11 +166,11 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
 <head>
 <meta charset="UTF-8">
 <title>${prodName || 'Producto Digital'} - Gift Corner Lab</title>
-<style>body{background:#111827;color:#fff;font-family:sans-serif;text-align:center;padding:50px;}</style>
+<style>body{background:#0b0e15;color:#fff;font-family:'Pixelify Sans',sans-serif;text-align:center;padding:50px;}</style>
 </head>
 <body>
 <h1>✨ ${prodName || 'Tu Producto Virtual'}</h1>
-<p>¡Gracias por tu compra en Gift Corner Lab! Este es tu archivo digital verificado.</p>
+<p>¡Gracias por tu compra en Gift Corner Lab! Este es tu archivo digital verificado y liberado.</p>
 </body>
 </html>`;
       const blob = new Blob([sampleHtml], { type: 'text/html' });
@@ -204,36 +205,45 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
     }
   };
 
+  // Manual payment verification toggle if pending
+  const handleVerifyPendingPayment = () => {
+    if (!completedOrder) return;
+    sfx.playChime();
+    const updated: Order = { ...completedOrder, paymentStatus: 'aprobado' };
+    setCompletedOrder(updated);
+    onOrderSuccess(updated);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
-      <div className="relative w-full max-w-2xl rounded-3xl bg-[#191b23] border border-white/10 p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+      <div className="relative w-full max-w-2xl rounded-2xl bg-[#191b23]/95 border border-white/10 p-5 sm:p-7 shadow-2xl overflow-y-auto max-h-[90vh] pixel-border">
         
         {/* Close Button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 rounded-xl bg-[#272a32] text-[#e1e2ec] hover:bg-[#32353d] transition-colors"
+          className="absolute top-4 right-4 p-2 rounded-lg bg-[#272a32] text-[#e1e2ec] hover:bg-[#32353d] transition-colors pixel-btn"
           id="checkout-close-btn"
         >
           <X className="w-5 h-5" />
         </button>
 
         {!completedOrder ? (
-          <form onSubmit={handleProceedPayment} className="flex flex-col gap-6">
+          <form onSubmit={handleProceedPayment} className="flex flex-col gap-5">
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#7c3aed]/20 text-[#d2bbff] text-xs font-bold uppercase mb-2">
-                <Lock className="w-3.5 h-3.5 text-[#4cd7f6]" /> Pasarela Cifrada &amp; Verificación Inmediata
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#7c3aed]/20 text-[#d2bbff] text-[10px] pixel-badge uppercase mb-2">
+                <Lock className="w-3 h-3 text-[#4cd7f6]" /> Pasarela Cifrada &amp; Verificación Inmediata
               </div>
-              <h2 className="font-display text-2xl font-bold text-[#e1e2ec]">
-                Finalizar Compra Segura
+              <h2 className="font-display text-lg sm:text-2xl font-bold text-white">
+                Finalizar Compra
               </h2>
-              <p className="text-xs text-[#ccc3d8]">
-                Elige tu método de pago preferido. Si compras productos virtuales, tus descargas se desbloquearán de inmediato.
+              <p className="text-xs text-[#ccc3d8] mt-1">
+                Moneda oficial de pago: <strong className="text-[#4cd7f6] font-mono">Soles Peruanos (S/.)</strong>. Los productos virtuales se liberan tras verificar el pago.
               </p>
             </div>
 
             {/* Modalidad Badge Banner */}
-            <div className={`p-3.5 rounded-2xl flex items-center gap-3 text-xs border ${
+            <div className={`p-3 rounded-xl flex items-center gap-3 text-xs border ${
               !hasPhysical
                 ? 'bg-[#7c3aed]/15 border-[#7c3aed]/40 text-[#ede0ff]'
                 : 'bg-[#03b5d3]/15 border-[#03b5d3]/40 text-[#e1f8ff]'
@@ -254,37 +264,37 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                   <div>
                     <strong className="block text-white font-semibold">📦 Entrega Física Coordinada por WhatsApp</strong>
                     <span className="text-[#ccc3d8] text-[11px]">
-                      Acordarás la entrega presencial directamente con Marcelo &amp; Angely.
+                      Al pagar, se enviará el pedido a WhatsApp únicamente con el producto y su código único.
                     </span>
                   </div>
                 </>
               )}
             </div>
 
-            {/* Datos Personales */}
-            <div className="p-4 rounded-2xl bg-[#272a32]/60 border border-white/5 flex flex-col gap-3">
+            {/* Datos de Facturación */}
+            <div className="p-3.5 rounded-xl bg-[#272a32]/60 border border-white/10 flex flex-col gap-2.5">
               <h3 className="font-display text-xs font-bold text-[#4cd7f6] uppercase tracking-wider flex items-center gap-1.5">
-                <Mail className="w-4 h-4" /> Datos de Contacto y Facturación
+                <Mail className="w-4 h-4" /> Datos de Contacto
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] text-[#958da1] block mb-1">Nombre Completo: *</label>
+                  <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Nombre Completo: *</label>
                   <input
                     type="text"
                     required
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed]"
+                    className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#7c3aed]"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-[#958da1] block mb-1">Correo Electrónico: *</label>
+                  <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Correo Electrónico: *</label>
                   <input
                     type="email"
                     required
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed]"
+                    className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#7c3aed]"
                   />
                 </div>
               </div>
@@ -292,40 +302,38 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
 
             {/* Si es FÍSICO: Teléfono / WhatsApp y Punto de Recogida */}
             {hasPhysical && (
-              <div className="p-4 rounded-2xl bg-[#272a32]/60 border border-[#03b5d3]/30 flex flex-col gap-3">
+              <div className="p-3.5 rounded-xl bg-[#272a32]/60 border border-[#03b5d3]/30 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-xs font-bold text-[#4cd7f6] uppercase tracking-wider flex items-center gap-1.5">
-                    <MapPin className="w-4 h-4 text-[#4cd7f6]" /> Coordinación y Punto de Recogida
+                    <MapPin className="w-4 h-4 text-[#4cd7f6]" /> Punto de Recogida de Referencia
                   </h3>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#03b5d3]/20 text-[#4cd7f6] font-semibold">
-                    📦 Obligatorio para Físicos
+                  <span className="text-[9px] pixel-badge px-2 py-0.5 rounded bg-[#03b5d3]/20 text-[#4cd7f6]">
+                    Entrega Presencial
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] text-[#958da1] block mb-1">Teléfono / WhatsApp: *</label>
+                    <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Teléfono / WhatsApp: *</label>
                     <input
                       type="tel"
                       required
-                      placeholder="+51 921 617 882"
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-[#03b5d3]"
+                      placeholder="+51 921 617 882"
+                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#03b5d3] font-mono"
                     />
                   </div>
 
                   <div>
-                    <label className="text-[11px] text-[#958da1] block mb-1">Punto de Recogida de Referencia: *</label>
+                    <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Punto de Entrega:</label>
                     <select
                       value={currentPickup}
                       onChange={(e) => setSelectedPickupLocation(e.target.value)}
-                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none focus:border-[#03b5d3] cursor-pointer"
+                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#03b5d3]"
                     >
-                      {allPickupLocations.map((loc) => (
-                        <option key={loc} value={loc}>
-                          📍 {loc}
-                        </option>
+                      {allPickupLocations.map((loc, idx) => (
+                        <option key={idx} value={loc}>{loc}</option>
                       ))}
                     </select>
                   </div>
@@ -333,18 +341,18 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
               </div>
             )}
 
-            {/* Payment Method Selector (Yape, Tarjeta, Mercado Pago, Transferencia) */}
-            <div className="flex flex-col gap-3">
-              <label className="text-xs text-[#958da1] font-semibold">Selecciona Método de Pago:</label>
+            {/* Payment Method Selector */}
+            <div className="flex flex-col gap-2.5">
+              <label className="text-xs text-[#958da1] font-semibold font-mono">Selecciona Método de Pago en Soles (S/.):</label>
               
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <button
                   type="button"
                   onClick={() => { setPaymentMethod('yape'); sfx.playClick(); }}
-                  className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
                     paymentMethod === 'yape'
-                      ? 'bg-[#7c3aed]/25 border-[#7c3aed] text-white shadow-lg shadow-[#7c3aed]/20'
-                      : 'bg-[#272a32] border-white/5 text-[#ccc3d8] hover:border-white/20'
+                      ? 'bg-[#7c3aed]/30 border-[#7c3aed] text-white'
+                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
                   }`}
                 >
                   <QrCode className="w-5 h-5 text-[#d2bbff]" />
@@ -354,10 +362,10 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                 <button
                   type="button"
                   onClick={() => { setPaymentMethod('card'); sfx.playClick(); }}
-                  className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
                     paymentMethod === 'card'
-                      ? 'bg-[#7c3aed]/25 border-[#7c3aed] text-white shadow-lg shadow-[#7c3aed]/20'
-                      : 'bg-[#272a32] border-white/5 text-[#ccc3d8] hover:border-white/20'
+                      ? 'bg-[#7c3aed]/30 border-[#7c3aed] text-white'
+                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
                   }`}
                 >
                   <CreditCard className="w-5 h-5 text-emerald-400" />
@@ -367,10 +375,10 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                 <button
                   type="button"
                   onClick={() => { setPaymentMethod('mercadopago'); sfx.playClick(); }}
-                  className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
                     paymentMethod === 'mercadopago'
-                      ? 'bg-[#03b5d3]/25 border-[#03b5d3] text-[#4cd7f6] shadow-lg shadow-[#03b5d3]/20'
-                      : 'bg-[#272a32] border-white/5 text-[#ccc3d8] hover:border-white/20'
+                      ? 'bg-[#03b5d3]/30 border-[#03b5d3] text-[#4cd7f6]'
+                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
                   }`}
                 >
                   <Sparkles className="w-5 h-5 text-[#4cd7f6]" />
@@ -380,10 +388,10 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                 <button
                   type="button"
                   onClick={() => { setPaymentMethod('transfer'); sfx.playClick(); }}
-                  className={`p-3 rounded-xl border text-xs font-bold flex flex-col items-center gap-1 transition-all ${
+                  className={`p-2.5 rounded-lg border text-xs font-bold pixel-btn flex flex-col items-center gap-1 transition-all ${
                     paymentMethod === 'transfer'
-                      ? 'bg-[#c81a42]/25 border-[#c81a42] text-[#ffdedf] shadow-lg'
-                      : 'bg-[#272a32] border-white/5 text-[#ccc3d8] hover:border-white/20'
+                      ? 'bg-[#c81a42]/30 border-[#c81a42] text-[#ffdedf]'
+                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
                   }`}
                 >
                   <ShieldCheck className="w-5 h-5 text-[#ffb2b7]" />
@@ -393,23 +401,23 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
 
               {/* YAPE PAYMENT DETAILS BOX */}
               {paymentMethod === 'yape' && (
-                <div className="p-4 rounded-2xl bg-[#7c3aed]/15 border border-[#7c3aed]/40 flex flex-col sm:flex-row items-center gap-4 text-xs animate-fadeIn">
-                  <div className="w-32 h-32 rounded-xl bg-white p-2 shrink-0 flex items-center justify-center shadow-md">
+                <div className="p-3.5 rounded-xl bg-[#7c3aed]/15 border border-[#7c3aed]/40 flex flex-col sm:flex-row items-center gap-4 text-xs animate-fadeIn">
+                  <div className="w-28 h-28 rounded-lg bg-white p-2 shrink-0 flex items-center justify-center shadow-md">
                     <img src={paymentConfig.yapeQrUrl} alt="Yape QR Code" className="w-full h-full object-contain" />
                   </div>
 
-                  <div className="flex-1 flex flex-col gap-2 text-left">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#7c3aed]/30 text-[#d2bbff] text-[10px] font-bold uppercase w-fit">
-                      📱 Escanea o Yapea Directo
+                  <div className="flex-1 flex flex-col gap-1.5 text-left w-full">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#7c3aed]/30 text-[#d2bbff] text-[9px] pixel-badge uppercase w-fit">
+                      📱 Yapear en Soles
                     </div>
 
-                    <div className="text-[#ccc3d8] leading-tight">
+                    <div className="text-[#ccc3d8] leading-tight text-[11px]">
                       <p><strong className="text-white">Titular:</strong> {paymentConfig.yapeName}</p>
-                      <p><strong className="text-white">Número de Yape:</strong> <span className="text-[#d2bbff] font-mono font-bold text-sm">{paymentConfig.yapePhone}</span></p>
-                      <p><strong className="text-white">Monto equivalente:</strong> <span className="text-emerald-400 font-bold">S/. {totalPen} PEN</span> (${total.toFixed(2)} USD)</p>
+                      <p><strong className="text-white">Número:</strong> <span className="text-[#d2bbff] font-mono font-bold">{paymentConfig.yapePhone}</span></p>
+                      <p><strong className="text-white">Monto a Yapear:</strong> <span className="text-emerald-400 font-bold font-mono">S/. {total.toFixed(2)} PEN</span></p>
                     </div>
 
-                    <div>
+                    <div className="mt-1">
                       <label className="text-[11px] text-[#d2bbff] font-bold block mb-1">
                         Ingresa el Número de Operación de Yape: *
                       </label>
@@ -419,69 +427,68 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                         placeholder="Ej. 84920194"
                         value={yapeOpNumber}
                         onChange={(e) => setYapeOpNumber(e.target.value)}
-                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-xl border border-[#7c3aed] focus:outline-none"
+                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-[#7c3aed] focus:outline-none font-mono"
                       />
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* REAL CARD FORM BOX */}
+              {/* CARD FORM BOX */}
               {paymentMethod === 'card' && (
-                <div className="p-4 rounded-2xl bg-[#10131a] border border-emerald-500/30 flex flex-col gap-3 text-xs animate-fadeIn">
+                <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col gap-2.5 text-xs animate-fadeIn">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-emerald-400 flex items-center gap-1.5">
-                      <CreditCard className="w-4 h-4" /> Tarjeta de Débito o Crédito (Visa, Mastercard, AMEX)
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4 text-emerald-400" /> Tarjeta de Débito / Crédito
                     </span>
-                    <span className="text-[10px] text-emerald-300">Cifrado SSL 256-bit</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">Pasarela Segura SSL</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1">Número de Tarjeta: *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="4532 •••• •••• 8892"
-                        value={cardNumber}
-                        onChange={(e) => setCardNumber(e.target.value)}
-                        className="w-full bg-[#191b23] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1">Nombre del Titular: *</label>
+                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Titular de la Tarjeta:</label>
                       <input
                         type="text"
                         required
                         value={cardHolder}
                         onChange={(e) => setCardHolder(e.target.value)}
-                        className="w-full bg-[#191b23] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none"
+                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1">Expiración (MM/AA): *</label>
+                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Número de Tarjeta:</label>
                       <input
                         type="text"
                         required
-                        placeholder="08/28"
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        className="w-full bg-[#191b23] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none font-mono"
+                        maxLength={19}
+                        placeholder="4557 •••• •••• 1234"
+                        value={cardNumber}
+                        onChange={(e) => setCardNumber(e.target.value)}
+                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none font-mono"
                       />
                     </div>
-
                     <div>
-                      <label className="text-[11px] text-[#958da1] block mb-1">CVC / CVV: *</label>
+                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Fecha Expiración (MM/AA):</label>
+                      <input
+                        type="text"
+                        required
+                        maxLength={5}
+                        placeholder="12/28"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-[#958da1] block mb-1 font-mono">CVV / CVC:</label>
                       <input
                         type="password"
-                        maxLength={4}
                         required
+                        maxLength={4}
                         placeholder="•••"
                         value={cardCvc}
                         onChange={(e) => setCardCvc(e.target.value)}
-                        className="w-full bg-[#191b23] text-xs text-white px-3 py-2 rounded-xl border border-white/10 focus:outline-none font-mono"
+                        className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none font-mono"
                       />
                     </div>
                   </div>
@@ -490,96 +497,154 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
 
               {/* MERCADO PAGO BOX */}
               {paymentMethod === 'mercadopago' && (
-                <div className="p-4 rounded-2xl bg-[#03b5d3]/15 border border-[#03b5d3]/40 flex flex-col gap-2 text-xs text-[#ccc3d8] animate-fadeIn">
+                <div className="p-3.5 rounded-xl bg-[#03b5d3]/15 border border-[#03b5d3]/40 flex flex-col gap-2 text-xs animate-fadeIn">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-[#4cd7f6]" />
-                    <strong className="text-white font-semibold">Mercado Pago Checkout Oficial</strong>
+                    <strong className="text-white font-semibold">Mercado Pago Perú (Acreditación Inmediata)</strong>
                   </div>
-                  <p className="text-[11px]">
-                    Pagos procesados directamente a través de Mercado Pago con soporte para Yape, Tarjeta de Crédito, Débito y PagoEfectivo.
+                  <p className="text-[#ccc3d8] text-[11px]">
+                    Acepta tarjetas de todos los bancos en Soles, PagoEfectivo y saldo en cuenta. Al presionar pagar se validará la transacción.
+                  </p>
+                </div>
+              )}
+
+              {/* TRANSFER BOX */}
+              {paymentMethod === 'transfer' && (
+                <div className="p-3.5 rounded-xl bg-[#c81a42]/15 border border-[#c81a42]/40 flex flex-col gap-2 text-xs animate-fadeIn">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-[#ffb2b7]" />
+                    <strong className="text-white font-semibold">Transferencia Bancaria BCP / Interbank</strong>
+                  </div>
+                  <p className="text-[#ccc3d8] text-[11px] font-mono">
+                    BCP Soles: 191-9482019-0-42 • CCI: 002-191-009482019042-55 (Titular: Marcelo Aliaga)
                   </p>
                 </div>
               )}
             </div>
 
-            {/* Summary */}
-            <div className="p-4 rounded-2xl bg-[#10131a] border border-white/5 flex flex-col gap-2 text-xs">
+            {/* Resumen de Compra en Soles */}
+            <div className="p-3.5 rounded-xl bg-[#10131a] border border-white/10 flex flex-col gap-1.5 text-xs">
               <div className="flex justify-between text-[#ccc3d8]">
-                <span>Subtotal ({items.length} productos):</span>
-                <span>${subtotal.toFixed(2)}</span>
+                <span>Subtotal ({currentItems.length} productos):</span>
+                <span className="font-mono">S/. {subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[#ccc3d8]">
-                <span>{hasPhysical ? 'Entrega en Punto de Recogida:' : 'Entrega Digital Inmediata:'}</span>
-                <span className="text-emerald-400 font-semibold">GRATIS</span>
+                <span>{hasPhysical ? 'Entrega en Punto de Recogida:' : 'Entrega Digital:'}</span>
+                <span className="text-emerald-400 font-semibold font-mono">
+                  {shipping === 0 ? 'GRATIS' : `S/. ${shipping.toFixed(2)}`}
+                </span>
               </div>
               <div className="flex justify-between text-[#ffb2b7]">
-                <span>Cupón BIENVENIDOLAB:</span>
-                <span>-${discount.toFixed(2)}</span>
+                <span>Descuento Cupón:</span>
+                <span className="font-mono">-S/. {discount.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-base font-bold text-[#e1e2ec] pt-2 border-t border-white/10">
+              <div className="flex justify-between text-sm sm:text-base font-bold text-white pt-2 border-t border-white/10">
                 <span>Total a Pagar:</span>
-                <span className="text-[#d2bbff]">${total.toFixed(2)} <span className="text-xs font-normal text-[#ccc3d8]">(S/. {totalPen} PEN)</span></span>
+                <span className="text-[#d2bbff] font-display">S/. {total.toFixed(2)}</span>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={isProcessing}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#7c3aed] via-[#732ee4] to-[#03b5d3] text-white font-display text-sm font-bold shadow-xl hover:opacity-95 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#7c3aed] via-[#732ee4] to-[#03b5d3] text-white font-display text-xs sm:text-sm font-bold shadow-xl hover:opacity-95 pixel-btn flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               id="pay-button"
             >
               <Lock className="w-4 h-4" />
-              {isProcessing ? 'Verificando y Procesando Pago...' : `Pagar Ahora $${total.toFixed(2)} (S/. ${totalPen} PEN)`}
+              {isProcessing ? 'Verificando y Procesando Pago...' : `Pagar Ahora S/. ${total.toFixed(2)} PEN`}
             </button>
           </form>
         ) : (
           /* ================= ORDER CONFIRMATION & POST-PAYMENT SCREEN ================= */
-          <div className="flex flex-col items-center text-center py-4 gap-5 animate-fadeIn">
-            <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-lg">
-              <CheckCircle className="w-9 h-9" />
+          <div className="flex flex-col items-center text-center py-4 gap-4 animate-fadeIn">
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg ${
+              completedOrder.paymentStatus === 'aprobado' 
+                ? 'bg-emerald-500/20 text-emerald-400' 
+                : 'bg-amber-500/20 text-amber-300'
+            }`}>
+              {completedOrder.paymentStatus === 'aprobado' ? <CheckCircle className="w-8 h-8" /> : <Lock className="w-8 h-8" />}
             </div>
 
             <div>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase mb-2">
-                <Check className="w-3.5 h-3.5" /> Pago Verificado &amp; Producto Liberado
+              <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded text-[10px] pixel-badge uppercase mb-2 ${
+                completedOrder.paymentStatus === 'aprobado' 
+                  ? 'bg-emerald-500/20 text-emerald-400' 
+                  : 'bg-amber-500/20 text-amber-300'
+              }`}>
+                {completedOrder.paymentStatus === 'aprobado' ? (
+                  <>
+                    <Check className="w-3.5 h-3.5" /> Pago Verificado &amp; Producto Liberado
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5" /> Pago Pendiente • Producto Retenido
+                  </>
+                )}
               </div>
-              <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-[#e1e2ec]">
-                ¡Gracias por tu compra en Gift Corner Lab!
+              <h2 className="font-display text-xl sm:text-2xl font-bold text-white">
+                {completedOrder.paymentStatus === 'aprobado' 
+                  ? '¡Gracias por tu compra en Gift Corner Lab!' 
+                  : 'Pedido Registrado - Verificación en Proceso'}
               </h2>
               <p className="text-xs text-[#958da1] font-mono mt-1">
-                Orden verificada: <strong className="text-[#d2bbff]">{completedOrder.id}</strong> • Método: <strong className="text-white uppercase">{completedOrder.paymentMethod}</strong>
+                Orden: <strong className="text-[#d2bbff]">{completedOrder.id}</strong> • Método: <strong className="text-white uppercase">{completedOrder.paymentMethod}</strong> • Total: <strong className="text-emerald-400">S/. {completedOrder.total.toFixed(2)}</strong>
               </p>
             </div>
 
-            {/* VIRTUAL PRODUCTS SECTION: IMMEDIATE DOWNLOAD */}
+            {/* VIRTUAL PRODUCTS SECTION: IMMEDIATE DOWNLOAD ON APPROVED, OR RETENIDO ON PENDING */}
             {virtualItems.length > 0 && (
-              <div className="w-full p-5 rounded-2xl bg-[#7c3aed]/15 border border-[#7c3aed]/40 text-left flex flex-col gap-3">
+              <div className="w-full p-4 sm:p-5 rounded-xl bg-[#7c3aed]/15 border border-[#7c3aed]/40 text-left flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Zap className="w-5 h-5 text-[#d2bbff]" />
-                    <h3 className="font-display text-sm font-bold text-white">
+                    <h3 className="font-display text-xs sm:text-sm font-bold text-white">
                       Descarga de Productos Virtuales
                     </h3>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#7c3aed]/30 text-[#ede0ff] font-semibold">
-                    Pago Aprobado
+                  <span className={`text-[9px] pixel-badge px-2 py-0.5 rounded ${
+                    completedOrder.paymentStatus === 'aprobado' 
+                      ? 'bg-emerald-500/20 text-emerald-300' 
+                      : 'bg-amber-500/20 text-amber-300'
+                  }`}>
+                    {completedOrder.paymentStatus === 'aprobado' ? 'Liberado' : 'Retenido'}
                   </span>
                 </div>
 
-                <p className="text-xs text-[#ccc3d8] leading-relaxed">
-                  Tu pago ha sido verificado. Puedes descargar tu archivo digital directamente ahora mismo o abrir tu página HTML en el navegador. También está guardado en tu panel <strong>"Mi Cuenta"</strong>.
-                </p>
+                {completedOrder.paymentStatus === 'aprobado' ? (
+                  <p className="text-xs text-[#ccc3d8] leading-relaxed">
+                    Tu pago ha sido verificado con éxito. Puedes descargar tu archivo digital inmediatamente abajo o abrir la página interactiva. También está guardado de forma permanente en tu panel <strong>"Mi Cuenta"</strong>.
+                  </p>
+                ) : (
+                  <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 flex flex-col gap-2">
+                    <p>
+                      <strong>⚠️ Producto Virtual Retenido:</strong> El acceso a la descarga está en espera de la confirmación del pago.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleVerifyPendingPayment}
+                      className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-display font-bold pixel-btn w-fit flex items-center gap-1.5"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Verificar y Liberar Pago Ahora</span>
+                    </button>
+                  </div>
+                )}
 
                 <div className="flex flex-col gap-2 pt-1">
                   {virtualItems.map((item) => (
                     <div
                       key={item.product.id}
-                      className="p-3.5 rounded-xl bg-[#10131a] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                      className="p-3 rounded-lg bg-[#10131a] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div>
-                        <span className="text-xs font-semibold text-white block">
-                          {item.product.name}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-white block">
+                            {item.product.name}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#4cd7f6] bg-[#03b5d3]/10 px-1.5 py-0.5 rounded">
+                            {item.product.code}
+                          </span>
+                        </div>
                         <span className="text-[11px] text-[#958da1] font-mono">
                           {item.product.downloadFile 
                             ? `${item.product.downloadFile.name} (${(item.product.downloadFile.size / 1024).toFixed(1)} KB)`
@@ -588,23 +653,31 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {item.product.downloadFile?.isHtml && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenHtmlPreview(item.product.downloadFile)}
-                            className="px-3 py-1.5 rounded-lg bg-[#272a32] hover:bg-[#32353d] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-white/10"
-                          >
-                            <ExternalLink className="w-3.5 h-3.5 text-[#4cd7f6]" /> Abrir Web
-                          </button>
-                        )}
+                        {completedOrder.paymentStatus === 'aprobado' ? (
+                          <>
+                            {item.product.downloadFile?.isHtml && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenHtmlPreview(item.product.downloadFile)}
+                                className="px-3 py-1.5 rounded-lg bg-[#272a32] hover:bg-[#32353d] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-white/10 pixel-btn"
+                              >
+                                <ExternalLink className="w-3.5 h-3.5 text-[#4cd7f6]" /> Abrir Web
+                              </button>
+                            )}
 
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadFile(item.product.downloadFile, item.product.name)}
-                          className="px-3.5 py-1.5 rounded-lg bg-[#03b5d3] hover:bg-[#4cd7f6] text-[#001f26] text-xs font-bold flex items-center gap-1.5 transition-colors shadow-md"
-                        >
-                          <Download className="w-3.5 h-3.5" /> Descargar Producto
-                        </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadFile(item.product.downloadFile, item.product.name)}
+                              className="px-3.5 py-1.5 rounded-lg bg-[#03b5d3] hover:bg-[#4cd7f6] text-[#001f26] text-xs font-bold pixel-btn flex items-center gap-1.5 transition-colors shadow-md"
+                            >
+                              <Download className="w-3.5 h-3.5" /> Descargar Producto
+                            </button>
+                          </>
+                        ) : (
+                          <span className="px-3 py-1.5 rounded bg-amber-500/10 text-amber-300 text-xs font-mono border border-amber-500/30 flex items-center gap-1">
+                            <Lock className="w-3 h-3" /> Retenido hasta pago
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -612,19 +685,31 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
               </div>
             )}
 
-            {/* PHYSICAL PRODUCTS SECTION: WHATSAPP REDIRECTION */}
+            {/* PHYSICAL PRODUCTS SECTION: WHATSAPP REDIRECTION (ONLY PRODUCT & CODE) */}
             {hasPhysical && (
-              <div className="w-full p-5 rounded-2xl bg-[#03b5d3]/15 border border-[#03b5d3]/40 text-left flex flex-col gap-3">
+              <div className="w-full p-4 sm:p-5 rounded-xl bg-[#03b5d3]/15 border border-[#03b5d3]/40 text-left flex flex-col gap-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <MessageCircle className="w-5 h-5 text-[#4cd7f6]" />
-                    <h3 className="font-display text-sm font-bold text-white">
+                    <h3 className="font-display text-xs sm:text-sm font-bold text-white">
                       Coordinación de Entrega Física por WhatsApp
                     </h3>
                   </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#03b5d3]/30 text-[#4cd7f6] font-semibold">
-                    Pago Verificado
+                  <span className="text-[9px] pixel-badge px-2 py-0.5 rounded bg-[#03b5d3]/30 text-[#4cd7f6]">
+                    Entrega
                   </span>
+                </div>
+
+                <p className="text-xs text-[#ccc3d8]">
+                  Pulsa el botón para abrir WhatsApp. Se enviará automáticamente el mensaje solicitando tu producto con su código único:
+                </p>
+
+                <div className="p-2.5 rounded bg-[#10131a] border border-white/10 font-mono text-[11px] text-[#4cd7f6]">
+                  {physicalItems.map(it => (
+                    <div key={it.product.id}>
+                      • {it.product.name} (Código: <strong>{it.product.code}</strong>)
+                    </div>
+                  ))}
                 </div>
 
                 <a
@@ -632,7 +717,7 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                   target="_blank"
                   rel="noreferrer"
                   onClick={() => sfx.playChime()}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:opacity-95 text-white font-display text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-lg transition-all"
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:opacity-95 text-white font-display text-xs sm:text-sm font-bold pixel-btn flex items-center justify-center gap-2 shadow-lg transition-all"
                   id="whatsapp-contact-btn"
                 >
                   <MessageCircle className="w-5 h-5" />
@@ -645,7 +730,7 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 rounded-xl bg-[#7c3aed] text-white font-display text-xs font-bold shadow-md hover:bg-[#732ee4] transition-colors"
+              className="px-6 py-2.5 rounded-xl bg-[#7c3aed] text-white font-display text-xs font-bold shadow-md hover:bg-[#732ee4] pixel-btn transition-colors"
             >
               Volver a la Tienda
             </button>
@@ -655,24 +740,27 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
         {/* PRE-PAYMENT PHYSICAL NOTICE MODAL */}
         {showPhysicalNoticeModal && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
-            <div className="w-full max-w-lg rounded-3xl bg-[#191b23] border border-[#03b5d3]/50 p-6 sm:p-7 shadow-2xl flex flex-col gap-4 text-left relative">
+            <div className="w-full max-w-lg rounded-2xl bg-[#191b23] border border-[#03b5d3]/50 p-6 shadow-2xl flex flex-col gap-4 text-left pixel-border">
               <div className="flex items-center gap-3 pb-3 border-b border-white/10">
-                <div className="w-12 h-12 rounded-2xl bg-[#03b5d3]/20 text-[#4cd7f6] flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-6 h-6" />
+                <div className="w-10 h-10 rounded-lg bg-[#03b5d3]/20 text-[#4cd7f6] flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#4cd7f6] block">
+                  <span className="text-[9px] pixel-badge uppercase tracking-wider text-[#4cd7f6] block">
                     Aviso Previo al Pago
                   </span>
-                  <h3 className="font-display text-lg font-bold text-white">
+                  <h3 className="font-display text-sm sm:text-base font-bold text-white">
                     Coordinación de Entrega por WhatsApp
                   </h3>
                 </div>
               </div>
 
-              <div className="text-xs text-[#ccc3d8] leading-relaxed flex flex-col gap-2.5">
+              <div className="text-xs text-[#ccc3d8] leading-relaxed flex flex-col gap-2">
                 <p>
-                  Punto de recogida seleccionado: <strong className="text-[#4cd7f6]">{currentPickup}</strong>. Tras pagar, se abrirá WhatsApp con los datos de tu pedido para acordar el encuentro.
+                  Punto de recogida seleccionado: <strong className="text-[#4cd7f6]">{currentPickup}</strong>.
+                </p>
+                <p>
+                  Al pagar, se abrirá WhatsApp con el código único de tu producto para acordar el encuentro con Marcelo &amp; Angely.
                 </p>
               </div>
 
@@ -680,7 +768,7 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                 <button
                   type="button"
                   onClick={() => setShowPhysicalNoticeModal(false)}
-                  className="px-4 py-2.5 rounded-xl bg-[#272a32] text-xs font-semibold text-[#ccc3d8] hover:text-white flex-1"
+                  className="px-4 py-2.5 rounded-lg bg-[#272a32] text-xs font-semibold text-[#ccc3d8] hover:text-white flex-1 pixel-btn"
                 >
                   Modificar Punto
                 </button>
@@ -691,7 +779,7 @@ Escribo para coordinar la entrega y acordar el día y la hora exacta en el punto
                     setHasConfirmedPhysicalNotice(true);
                     executePayment();
                   }}
-                  className="px-5 py-2.5 rounded-xl bg-[#03b5d3] text-[#001f26] font-display text-xs font-bold shadow-lg flex items-center justify-center gap-2 flex-1"
+                  className="px-5 py-2.5 rounded-lg bg-[#03b5d3] text-[#001f26] font-display text-xs font-bold pixel-btn shadow-lg flex items-center justify-center gap-2 flex-1"
                 >
                   <Lock className="w-3.5 h-3.5" />
                   <span>Entendido, Pagar Ahora</span>

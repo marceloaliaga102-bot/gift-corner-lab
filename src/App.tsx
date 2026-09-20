@@ -58,11 +58,12 @@ export default function App() {
           { product: PRODUCTS[0], quantity: 1 },
           { product: PRODUCTS[3], quantity: 1 }
         ],
-        subtotal: 39.98,
-        shipping: 3.50,
-        discount: 5.00,
-        total: 38.48,
+        subtotal: 79.80,
+        shipping: 0.00,
+        discount: 15.00,
+        total: 64.80,
         status: 'Completado',
+        paymentStatus: 'aprobado',
         shippingAddress: 'Av. Del Parque 450, Dpto 8B'
       }
     ];
@@ -183,20 +184,21 @@ export default function App() {
     }
     const updatedOrders = [newOrder, ...orders];
     setOrders(updatedOrders);
+    saveOrders(updatedOrders);
     setCart([]);
     await cloudSubmitOrder(newOrder);
   };
 
   const handleOpenWhatsApp = () => {
     sfx.playClick();
-    const msg = encodeURIComponent('¡Hola Marcelo y Angely! Me encantaron los regalos de Gift Corner Lab y quisiera una consulta personalizada.');
+    const msg = encodeURIComponent('¡Hola Marcelo y Angely! Quisiera hacer una consulta sobre los regalos de Gift Corner Lab.');
     window.open(`https://wa.me/51921617882?text=${msg}`, '_blank');
   };
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-[#10131a] text-[#e1e2ec] font-body flex flex-col selection:bg-[#7c3aed] selection:text-white">
+    <div className="min-h-screen bg-black/40 backdrop-blur-[1px] text-[#e1e2ec] font-body flex flex-col selection:bg-[#7c3aed] selection:text-white">
       {/* Top Header Navigation */}
       <Header
         currentView={currentView}

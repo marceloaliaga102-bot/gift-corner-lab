@@ -19,6 +19,7 @@ export interface ProductDownloadFile {
 
 export interface Product {
   id: string;
+  code: string;
   name: string;
   category: 'fisicos' | 'virtuales' | 'porquesi';
   productType?: 'virtual' | 'fisico';
