@@ -61,11 +61,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onOpenPreview3D
 }) => {
   React.useEffect(() => {
+    if (!product) return;
+    const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = '';
+      document.body.style.overflow = prev;
     };
-  }, []);
+  }, [product]);
 
   if (!product) return null;
 

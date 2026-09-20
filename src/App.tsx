@@ -409,8 +409,8 @@ export default function App() {
         onOpenWhatsApp={handleOpenWhatsApp}
       />
 
-      {/* Modals mounted directly onto document.body to prevent any parent overflow or centering displacement */}
-      {createPortal(
+      {/* Modals mounted directly onto document.body ONLY when open to prevent any background effect/scroll blocking */}
+      {preview3DOpen && createPortal(
         <Preview3DModal
           isOpen={preview3DOpen}
           onClose={() => setPreview3DOpen(false)}
@@ -422,7 +422,7 @@ export default function App() {
         document.body
       )}
 
-      {createPortal(
+      {checkoutOpen && createPortal(
         <CheckoutModal
           isOpen={checkoutOpen}
           onClose={() => setCheckoutOpen(false)}
@@ -432,7 +432,7 @@ export default function App() {
         document.body
       )}
 
-      {createPortal(
+      {detailProduct && createPortal(
         <ProductDetailModal
           product={detailProduct}
           onClose={() => setDetailProduct(null)}
@@ -442,7 +442,7 @@ export default function App() {
         document.body
       )}
 
-      {createPortal(
+      {authModalOpen && createPortal(
         <AuthModal
           isOpen={authModalOpen}
           onClose={() => setAuthModalOpen(false)}

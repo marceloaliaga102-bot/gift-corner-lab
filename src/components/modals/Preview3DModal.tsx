@@ -16,6 +16,15 @@ export const Preview3DModal: React.FC<Preview3DModalProps> = ({
   const [isOpened, setIsOpened] = useState(false);
   const [selectedCoupon, setSelectedCoupon] = useState<number | null>(null);
 
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const coupons = [
