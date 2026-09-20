@@ -58,7 +58,7 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
   const isCreator = currentUser.role === 'creator';
 
-  // Extract all digital downloads from all completed orders + default virtuals
+  // Extract all digital downloads from all completed orders
   const purchasedDownloads: { 
     title: string; 
     code?: string;
@@ -67,33 +67,27 @@ export const AccountView: React.FC<AccountViewProps> = ({
     date: string;
     isPaid: boolean;
     orderId?: string;
-  }[] = [
-    {
-      title: 'Cuponera de Amor & Carta Digital 3D',
-      code: 'GCL-VIR-01',
-      is3D: true,
-      date: '2026-09-18',
-      isPaid: true
-    }
-  ];
+  }[] = [];
 
   // Scan user's orders for digital items with downloadable files
   orders.forEach((order) => {
     order.items.forEach((item) => {
-      const isPaid = order.paymentStatus === 'aprobado' || !order.paymentStatus;
+      const isPaid = order.paymentStatus === 'aprobado';
       if (item.product.downloadFile) {
         purchasedDownloads.push({
           title: item.product.name,
           code: item.product.code,
           file: item.product.downloadFile,
+          is3D: item.product.has3DPreview,
           date: order.date,
           isPaid,
           orderId: order.id
         });
-      } else if (item.product.category === 'virtuales' && item.product.id !== 'cuponera-amor-3d') {
+      } else if (item.product.category === 'virtuales' || item.product.productType === 'virtual') {
         purchasedDownloads.push({
           title: item.product.name,
           code: item.product.code,
+          is3D: item.product.has3DPreview,
           date: order.date,
           isPaid,
           orderId: order.id
@@ -204,7 +198,11 @@ export const AccountView: React.FC<AccountViewProps> = ({
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {item.is3D ? (
+                {!item.isPaid ? (
+                  <span className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs font-mono flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5" /> Retenido hasta confirmación
+                  </span>
+                ) : item.is3D ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -215,10 +213,6 @@ export const AccountView: React.FC<AccountViewProps> = ({
                   >
                     <ExternalLink className="w-3.5 h-3.5" /> Abrir Carta 3D
                   </button>
-                ) : !item.isPaid ? (
-                  <span className="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs font-mono flex items-center gap-1.5">
-                    <Lock className="w-3.5 h-3.5" /> Retenido hasta confirmación
-                  </span>
                 ) : item.file ? (
                   <div className="flex items-center gap-1.5">
                     {item.file.isHtml && (

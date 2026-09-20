@@ -15,6 +15,61 @@ interface CheckoutModalProps {
   onOrderSuccess: (order: Order) => void;
 }
 
+// Validate Luhn Algorithm for credit/debit cards
+function isValidLuhn(numberStr: string): boolean {
+  const clean = numberStr.replace(/\D/g, '');
+  if (clean.length < 13 || clean.length > 19) return false;
+  let sum = 0;
+  let shouldDouble = false;
+  for (let i = clean.length - 1; i >= 0; i--) {
+    let digit = parseInt(clean.charAt(i), 10);
+    if (shouldDouble) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    shouldDouble = !shouldDouble;
+  }
+  return sum % 10 === 0;
+}
+
+// Validate card expiry (MM/YY or MM/YYYY)
+function isValidExpiry(expiryStr: string): boolean {
+  const match = expiryStr.trim().match(/^(\d{2})\/(\d{2}|\d{4})$/);
+  if (!match) return false;
+  const month = parseInt(match[1], 10);
+  let year = parseInt(match[2], 10);
+  if (year < 100) year += 2000;
+  if (month < 1 || month > 12) return false;
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  if (year < currentYear) return false;
+  if (year === currentYear && month < currentMonth) return false;
+  return true;
+}
+
+// Validate real bank / Yape / Plin operation number
+function isValidOperationCode(codeStr: string): { isValid: boolean; reason?: string } {
+  const clean = codeStr.trim().replace(/\s+/g, '');
+  if (!clean) {
+    return { isValid: false, reason: 'Debes ingresar el número de operación de tu comprobante.' };
+  }
+  if (!/^\d+$/.test(clean)) {
+    return { isValid: false, reason: 'El número de operación debe contener únicamente dígitos numéricos.' };
+  }
+  if (clean.length < 6 || clean.length > 14) {
+    return { isValid: false, reason: 'El número de operación debe tener entre 6 y 14 dígitos (código bancario real).' };
+  }
+  if (/^(\d)\1+$/.test(clean)) {
+    return { isValid: false, reason: 'El código ingresado es falso o inválido (dígitos idénticos repetidos).' };
+  }
+  if (clean === '123456' || clean === '1234567' || clean === '12345678' || clean === '87654321') {
+    return { isValid: false, reason: 'El código ingresado no corresponde a una transacción bancaria válida.' };
+  }
+  return { isValid: true };
+}
+
 export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
@@ -98,9 +153,34 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleProceedPayment = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
 
-    if (paymentMethod === 'yape' && !yapeOpNumber.trim()) {
-      alert('Por favor ingresa el número de operación de tu comprobante de Yape.');
-      return;
+    // STRICT VALIDATION: YAPE & TRANSFER
+    if (paymentMethod === 'yape' || paymentMethod === 'transfer') {
+      const opCheck = isValidOperationCode(yapeOpNumber);
+      if (!opCheck.isValid) {
+        alert(`❌ Compra denegada: ${opCheck.reason}\n\nLos datos ingresados no son reales o están incompletos. Para evitar compras falsas, se requiere un código de comprobante bancario auténtico.`);
+        return;
+      }
+    }
+
+    // STRICT VALIDATION: CARD (LUHN, EXPIRY, CVV, HOLDER)
+    if (paymentMethod === 'card') {
+      const cleanNum = cardNumber.replace(/\D/g, '');
+      if (!isValidLuhn(cleanNum)) {
+        alert('❌ Compra denegada: El número de tarjeta no es válido o no cumple con el algoritmo bancario internacional de control (Luhn). Comprueba los dígitos de tu tarjeta.');
+        return;
+      }
+      if (!isValidExpiry(cardExpiry)) {
+        alert('❌ Compra denegada: La fecha de expiración es inválida o la tarjeta ya se encuentra vencida.');
+        return;
+      }
+      if (!/^\d{3,4}$/.test(cardCvc.trim())) {
+        alert('❌ Compra denegada: El código de seguridad CVV/CVC debe ser de 3 o 4 dígitos numéricos.');
+        return;
+      }
+      if (!cardHolder.trim() || cardHolder.trim().length < 3) {
+        alert('❌ Compra denegada: Debes ingresar el nombre del titular como figura en la tarjeta.');
+        return;
+      }
     }
 
     if (hasPhysical && !hasConfirmedPhysicalNotice) {
@@ -124,19 +204,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const newOrder: Order = {
         id: `GC-${Math.floor(100000 + Math.random() * 900000)}`,
         date: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }),
-        customerName,
-        customerEmail,
-        customerPhone: hasPhysical ? customerPhone : undefined,
+        customerName: 'Cliente',
+        customerEmail: '',
+        customerPhone: undefined,
         pickupLocation: hasPhysical ? currentPickup : undefined,
         items: orderItems,
         subtotal,
         shipping,
         discount,
         total,
-        status: hasPhysical ? 'En preparación' : 'Completado',
+        status: 'En preparación',
         paymentMethod,
-        yapeOpNumber: paymentMethod === 'yape' ? yapeOpNumber.trim() : undefined,
-        paymentStatus: 'aprobado',
+        yapeOpNumber: (paymentMethod === 'yape' || paymentMethod === 'transfer') 
+          ? yapeOpNumber.trim() 
+          : (paymentMethod === 'card' ? `CARD-${cardNumber.replace(/\D/g, '').slice(-4)}` : undefined),
+        paymentStatus: 'pendiente', // ALWAYS PENDING UNTIL VERIFIED BY ADMIN
         shippingAddress: hasPhysical ? `Punto de Recogida: ${currentPickup}` : undefined
       };
 
@@ -210,15 +292,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
       w.document.close();
     }
-  };
-
-  // Manual payment verification toggle if pending
-  const handleVerifyPendingPayment = () => {
-    if (!completedOrder) return;
-    sfx.playChime();
-    const updated: Order = { ...completedOrder, paymentStatus: 'aprobado' };
-    setCompletedOrder(updated);
-    onOrderSuccess(updated);
   };
 
   return (
@@ -483,6 +556,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <p className="text-[#ccc3d8] text-[11px] font-mono">
                     BCP Soles: 191-9482019-0-42 • CCI: 002-191-009482019042-55 (Titular: Gift Corner Lab)
                   </p>
+                  <div className="mt-2">
+                    <label className="text-[11px] text-[#ffdedf] font-bold block mb-1">
+                      Ingresa el Número de Operación de la Transferencia: *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej. 84920194"
+                      value={yapeOpNumber}
+                      onChange={(e) => setYapeOpNumber(e.target.value)}
+                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-[#c81a42] focus:outline-none font-mono"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -580,18 +666,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     Tu pago ha sido verificado con éxito. Puedes descargar tu archivo digital inmediatamente abajo o abrir la página interactiva. También está guardado de forma permanente en tu panel <strong>"Mi Cuenta"</strong>.
                   </p>
                 ) : (
-                  <div className="p-3 rounded-lg bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 flex flex-col gap-2">
-                    <p>
-                      <strong>⚠️ Producto Virtual Retenido:</strong> El acceso a la descarga está en espera de la confirmación del pago.
+                  <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs text-amber-200 flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-amber-300 font-bold">
+                      <Lock className="w-4 h-4 shrink-0" />
+                      <span>Archivos Digitales Retenidos — En Espera de Verificación Real</span>
+                    </div>
+                    <p className="text-[#ccc3d8] leading-relaxed text-[11px]">
+                      Tu código de operación <strong>{completedOrder.yapeOpNumber || 'registrado'}</strong> está siendo auditado contra nuestra cuenta bancaria. Los archivos permanecerán protegidos y bloqueados hasta que el administrador apruebe el abono. No se admiten datos falsos.
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleVerifyPendingPayment}
-                      className="px-3 py-1.5 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-display font-bold pixel-btn w-fit flex items-center gap-1.5"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Verificar y Liberar Pago Ahora</span>
-                    </button>
                   </div>
                 )}
 

@@ -70,12 +70,22 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   const handleApprovePayment = async (orderId: string) => {
-    const updated = ordersList.map(o => o.id === orderId ? { ...o, paymentStatus: 'aprobado' as const } : o);
+    const updated = ordersList.map(o => o.id === orderId ? { ...o, paymentStatus: 'aprobado' as const, status: 'Completado' as const } : o);
     setOrdersList(updated);
     saveOrders(updated);
     const found = updated.find(o => o.id === orderId);
     if (found) await cloudSubmitOrder(found);
     sfx.playChime();
+  };
+
+  const handleRejectPayment = async (orderId: string) => {
+    if (!confirm('¿Deseas rechazar este pedido por comprobante falso o pago no recibido? Los productos seguirán retenidos y la orden quedará cancelada.')) return;
+    const updated = ordersList.map(o => o.id === orderId ? { ...o, paymentStatus: 'rechazado' as const, status: 'Cancelado' as const } : o);
+    setOrdersList(updated);
+    saveOrders(updated);
+    const found = updated.find(o => o.id === orderId);
+    if (found) await cloudSubmitOrder(found);
+    sfx.playClick();
   };
 
   // Cloud Synchronization State
@@ -1169,30 +1179,54 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     </td>
                     <td className="py-3 px-2 font-mono font-bold text-white">S/. {ord.total.toFixed(2)}</td>
                     <td className="py-3 px-2">
-                      <span className="uppercase font-mono text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white">
+                      <span className="uppercase font-mono text-[10px] px-2 py-0.5 rounded bg-white/5 border border-white/10 text-white font-bold block w-fit">
                         {ord.paymentMethod || 'YAPE'}
                       </span>
+                      {ord.yapeOpNumber && (
+                        <span className="text-[10px] font-mono text-[#4cd7f6] font-semibold mt-1 block">
+                          Op: <strong className="text-white">{ord.yapeOpNumber}</strong>
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-2">
                       <span className={`px-2 py-0.5 rounded text-[8px] pixel-badge ${
                         ord.paymentStatus === 'aprobado' 
-                          ? 'bg-emerald-500/20 text-emerald-400' 
-                          : 'bg-amber-500/20 text-amber-300'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' 
+                          : ord.paymentStatus === 'rechazado'
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                       }`}>
-                        {ord.paymentStatus === 'aprobado' ? 'Aprobado (Liberado)' : 'Pendiente (Retenido)'}
+                        {ord.paymentStatus === 'aprobado' 
+                          ? 'Aprobado (Liberado)' 
+                          : ord.paymentStatus === 'rechazado'
+                          ? 'Rechazado (Falso / Anulado)'
+                          : 'Pendiente (Retenido)'}
                       </span>
                     </td>
                     <td className="py-3 px-2 text-right">
-                      {ord.paymentStatus !== 'aprobado' ? (
-                        <button
-                          type="button"
-                          onClick={() => handleApprovePayment(ord.id)}
-                          className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold pixel-btn transition-all flex items-center gap-1 ml-auto"
-                        >
-                          <Check className="w-3 h-3" /> Aprobar y Liberar
-                        </button>
+                      {ord.paymentStatus !== 'aprobado' && ord.paymentStatus !== 'rechazado' ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleApprovePayment(ord.id)}
+                            className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold pixel-btn transition-all flex items-center gap-1"
+                            title="Aprobar pago y liberar descargas al cliente"
+                          >
+                            <Check className="w-3 h-3" /> Aprobar y Liberar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRejectPayment(ord.id)}
+                            className="px-2 py-1 rounded bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800 text-[10px] font-bold pixel-btn transition-all flex items-center gap-1"
+                            title="Rechazar pedido por datos falsos o pago no recibido"
+                          >
+                            <X className="w-3 h-3" /> Rechazar
+                          </button>
+                        </div>
+                      ) : ord.paymentStatus === 'aprobado' ? (
+                        <span className="text-emerald-400 text-[10px] font-mono font-bold">Liberado</span>
                       ) : (
-                        <span className="text-emerald-400 text-[10px] font-mono">Liberado</span>
+                        <span className="text-red-400 text-[10px] font-mono">Cancelado</span>
                       )}
                     </td>
                   </tr>

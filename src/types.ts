@@ -77,7 +77,7 @@ export interface Order {
   shipping: number;
   discount: number;
   total: number;
-  status: 'Completado' | 'En preparación' | 'Enviado';
+  status: 'Completado' | 'En preparación' | 'Enviado' | 'Cancelado';
   shippingAddress?: string;
   pickupLocation?: string;
   paymentMethod?: 'yape' | 'card' | 'mercadopago' | 'transfer';
