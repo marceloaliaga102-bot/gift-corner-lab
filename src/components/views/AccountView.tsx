@@ -2,7 +2,7 @@ import React from 'react';
 import { Order, AppView, User, ProductDownloadFile } from '../../types';
 import { 
   User as UserIcon, Download, Package, ExternalLink, ShieldCheck, LogOut, FileCode,
-  MessageCircle, MapPin, Zap, Box, Lock, CheckCircle
+  MessageCircle, MapPin, Zap, Box, Lock, CheckCircle, RefreshCw, AlertTriangle, Trash2
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
 
@@ -13,6 +13,7 @@ interface AccountViewProps {
   onOpenPreview3D: () => void;
   onOpenAuthModal: (mode?: 'login' | 'register') => void;
   onLogout: () => void;
+  onDeleteOrder?: (orderId: string) => void;
 }
 
 export const AccountView: React.FC<AccountViewProps> = ({
@@ -21,7 +22,8 @@ export const AccountView: React.FC<AccountViewProps> = ({
   onNavigate,
   onOpenPreview3D,
   onOpenAuthModal,
-  onLogout
+  onLogout,
+  onDeleteOrder
 }) => {
   if (!currentUser) {
     return (
@@ -260,10 +262,27 @@ export const AccountView: React.FC<AccountViewProps> = ({
 
       {/* Orders History */}
       <div className="p-5 sm:p-7 rounded-2xl bg-[#191b23]/90 border border-white/10 shadow-xl flex flex-col gap-4 pixel-border">
-        <h2 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
-          <Package className="w-4 h-4 text-[#d2bbff]" />
-          Historial de Pedidos
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-display text-sm sm:text-base font-bold text-white flex items-center gap-2">
+            <Package className="w-4 h-4 text-[#d2bbff]" />
+            Historial de Pedidos
+          </h2>
+          {orders.length > 0 && onDeleteOrder && (
+            <button
+              type="button"
+              onClick={() => {
+                sfx.playClick();
+                if (confirm('¿Deseas limpiar todos los pedidos de tu historial?')) {
+                  orders.forEach(o => onDeleteOrder(o.id));
+                }
+              }}
+              className="text-[11px] text-[#958da1] hover:text-red-400 flex items-center gap-1 transition-colors px-2 py-1 rounded bg-white/5 border border-white/10 hover:border-red-800"
+            >
+              <Trash2 className="w-3 h-3" />
+              <span>Limpiar historial</span>
+            </button>
+          )}
+        </div>
 
         {orders.length === 0 ? (
           <p className="text-xs text-[#958da1] py-4 text-center font-mono">
@@ -303,13 +322,36 @@ export const AccountView: React.FC<AccountViewProps> = ({
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`px-2 py-0.5 rounded text-[8px] pixel-badge ${
-                        ord.paymentStatus === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-300'
+                        ord.paymentStatus === 'aprobado'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : ord.paymentStatus === 'rechazado'
+                          ? 'bg-red-500/20 text-red-400'
+                          : 'bg-amber-500/20 text-amber-300'
                       }`}>
-                        {ord.paymentStatus === 'aprobado' ? 'Pago Verificado' : 'Pago Pendiente'}
+                        {ord.paymentStatus === 'aprobado'
+                          ? 'Pago Verificado'
+                          : ord.paymentStatus === 'rechazado'
+                          ? '⚠ Pago Rechazado'
+                          : 'Pago Pendiente'}
                       </span>
                       <span className="text-[#ccc3d8] font-mono text-[11px]">
                         {ord.status}
                       </span>
+                      {onDeleteOrder && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sfx.playClick();
+                            if (confirm(`¿Deseas eliminar el pedido ${ord.id} de tu historial?`)) {
+                              onDeleteOrder(ord.id);
+                            }
+                          }}
+                          className="p-1 rounded bg-red-950/40 hover:bg-red-900 text-red-400 hover:text-white border border-red-800/50 transition-colors ml-1"
+                          title="Eliminar este pedido de mi historial"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -336,6 +378,33 @@ export const AccountView: React.FC<AccountViewProps> = ({
                         <MessageCircle className="w-3.5 h-3.5" />
                         <span>Pedir por WhatsApp</span>
                       </a>
+                    </div>
+                  )}
+
+                  {/* Rejected order: show notice and retry button */}
+                  {ord.paymentStatus === 'rechazado' && (
+                    <div className="p-3 rounded-xl bg-red-950/30 border border-red-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-start gap-2 text-red-300 text-xs">
+                        <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+                        <span>
+                          <strong className="text-red-300">Pago rechazado por el administrador.</strong>{' '}
+                          El comprobante no fue válido o el pago no fue recibido. Puedes volver a intentar la compra.
+                        </span>
+                      </div>
+                      {onDeleteOrder && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sfx.playClick();
+                            if (confirm('¿Deseas limpiar este pedido rechazado para poder volver a comprar? La orden será eliminada de tu historial.')) {
+                              onDeleteOrder(ord.id);
+                            }
+                          }}
+                          className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/40 border border-red-500/50 text-red-300 text-[11px] font-bold pixel-btn flex items-center gap-1.5 shrink-0 transition-colors"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" /> Limpiar y Reintentar
+                        </button>
+                      )}
                     </div>
                   )}
 

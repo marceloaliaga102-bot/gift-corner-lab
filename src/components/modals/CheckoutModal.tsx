@@ -109,10 +109,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (items.length > 0) {
         setActiveItemsSnapshot([...items]);
       }
+      // Lock body scroll when modal is open
+      document.body.style.overflow = 'hidden';
     } else {
       setCompletedOrder(null);
       setHasConfirmedPhysicalNotice(false);
+      document.body.style.overflow = '';
     }
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isOpen, items]);
 
   if (!isOpen) return null;
@@ -295,8 +301,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-xl animate-fadeIn overflow-y-auto">
-      <div ref={modalRef} className="relative w-full max-w-2xl rounded-2xl bg-[#191b23]/95 border border-white/10 p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[92vh] my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
+      <div ref={modalRef} className="relative w-full max-w-2xl rounded-2xl bg-[#191b23]/95 border border-white/10 p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[90dvh] sm:max-h-[88vh]">
         
         {/* Close Button */}
         <button

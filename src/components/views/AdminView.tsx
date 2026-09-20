@@ -25,7 +25,9 @@ import {
 import { 
   cloudBulkUploadProducts, 
   testCloudConnection,
-  cloudSubmitOrder
+  cloudSubmitOrder,
+  cloudDeleteOrder,
+  cloudClearAllOrders
 } from '../../services/cloudDatabase';
 import { saveOrders } from '../../utils/storage';
 
@@ -39,6 +41,9 @@ interface AdminViewProps {
   onRequestLoginCreator: () => void;
   onLogoutCreator: () => void;
   isCloudActive?: boolean;
+  onDeleteOrder?: (orderId: string) => void;
+  onClearAllOrders?: () => void;
+  onUpdateOrder?: (order: Order) => void;
 }
 
 export const AdminView: React.FC<AdminViewProps> = ({
@@ -50,7 +55,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
   isCreator,
   onRequestLoginCreator,
   onLogoutCreator,
-  isCloudActive = false
+  isCloudActive = false,
+  onDeleteOrder,
+  onClearAllOrders,
+  onUpdateOrder
 }) => {
   const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'payment_config' | 'database' | 'cloud_sync'>('products');
   const [ordersList, setOrdersList] = useState<Order[]>(orders);
@@ -74,7 +82,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setOrdersList(updated);
     saveOrders(updated);
     const found = updated.find(o => o.id === orderId);
-    if (found) await cloudSubmitOrder(found);
+    if (found) {
+      await cloudSubmitOrder(found);
+      if (onUpdateOrder) onUpdateOrder(found);
+    }
     sfx.playChime();
   };
 
@@ -84,7 +95,35 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setOrdersList(updated);
     saveOrders(updated);
     const found = updated.find(o => o.id === orderId);
-    if (found) await cloudSubmitOrder(found);
+    if (found) {
+      await cloudSubmitOrder(found);
+      if (onUpdateOrder) onUpdateOrder(found);
+    }
+    sfx.playClick();
+  };
+
+  const handleDeleteSingleOrder = async (orderId: string) => {
+    if (!confirm(`¿Estás seguro de eliminar el pedido ${orderId}? Esta acción no se puede deshacer.`)) return;
+    const updated = ordersList.filter(o => o.id !== orderId);
+    setOrdersList(updated);
+    saveOrders(updated);
+    if (onDeleteOrder) {
+      onDeleteOrder(orderId);
+    } else {
+      await cloudDeleteOrder(orderId);
+    }
+    sfx.playClick();
+  };
+
+  const handleClearAllOrdersAction = async () => {
+    if (!confirm('¿ATENCIÓN: Deseas vaciar TODO el historial de pedidos? Se borrarán todos los registros de compras locales y en la nube.')) return;
+    setOrdersList([]);
+    saveOrders([]);
+    if (onClearAllOrders) {
+      onClearAllOrders();
+    } else {
+      await cloudClearAllOrders();
+    }
     sfx.playClick();
   };
 
@@ -1129,15 +1168,29 @@ export const AdminView: React.FC<AdminViewProps> = ({
                 Pedidos de Clientes ({ordersList.length})
               </h2>
               <p className="text-xs text-[#ccc3d8]">
-                Revisa los pedidos recibidos, pagos en Soles y libera descargas virtuales pendientes.
+                Revisa los pedidos recibidos, pagos en Soles, libera descargas o borra registros de prueba.
               </p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-[#10131a] border border-white/10 text-right">
-              <span className="text-[10px] text-[#958da1] block uppercase font-mono">Total Facturado</span>
-              <span className="font-display text-lg sm:text-xl font-bold text-emerald-400">
-                S/. {ordersList.reduce((acc, o) => acc + (o.total || 0), 0).toFixed(2)}
-              </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {ordersList.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllOrdersAction}
+                  className="px-3.5 py-2 rounded-xl bg-red-950/50 hover:bg-red-900 border border-red-800 text-red-300 text-xs font-bold pixel-btn transition-all flex items-center gap-1.5 shadow-sm"
+                  title="Borrar todo el historial de pedidos de la tienda y la nube"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Vaciar Historial ({ordersList.length})</span>
+                </button>
+              )}
+
+              <div className="p-3 rounded-xl bg-[#10131a] border border-white/10 text-right">
+                <span className="text-[10px] text-[#958da1] block uppercase font-mono">Total Facturado</span>
+                <span className="font-display text-base sm:text-lg font-bold text-emerald-400">
+                  S/. {ordersList.reduce((acc, o) => acc + (o.total || 0), 0).toFixed(2)}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1204,33 +1257,52 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-2 text-right">
-                      {ord.paymentStatus !== 'aprobado' && ord.paymentStatus !== 'rechazado' ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleApprovePayment(ord.id)}
-                            className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold pixel-btn transition-all flex items-center gap-1"
-                            title="Aprobar pago y liberar descargas al cliente"
-                          >
-                            <Check className="w-3 h-3" /> Aprobar y Liberar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleRejectPayment(ord.id)}
-                            className="px-2 py-1 rounded bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800 text-[10px] font-bold pixel-btn transition-all flex items-center gap-1"
-                            title="Rechazar pedido por datos falsos o pago no recibido"
-                          >
-                            <X className="w-3 h-3" /> Rechazar
-                          </button>
-                        </div>
-                      ) : ord.paymentStatus === 'aprobado' ? (
-                        <span className="text-emerald-400 text-[10px] font-mono font-bold">Liberado</span>
-                      ) : (
-                        <span className="text-red-400 text-[10px] font-mono">Cancelado</span>
-                      )}
+                      <div className="flex items-center justify-end gap-1.5">
+                        {ord.paymentStatus !== 'aprobado' && ord.paymentStatus !== 'rechazado' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleApprovePayment(ord.id)}
+                              className="px-2.5 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black text-[10px] font-bold pixel-btn transition-all flex items-center gap-1"
+                              title="Aprobar pago y liberar descargas al cliente"
+                            >
+                              <Check className="w-3 h-3" /> Aprobar y Liberar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRejectPayment(ord.id)}
+                              className="px-2 py-1 rounded bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800 text-[10px] font-bold pixel-btn transition-all flex items-center gap-1"
+                              title="Rechazar pedido por datos falsos o pago no recibido"
+                            >
+                              <X className="w-3 h-3" /> Rechazar
+                            </button>
+                          </>
+                        )}
+                        {ord.paymentStatus === 'aprobado' && (
+                          <span className="text-emerald-400 text-[10px] font-mono font-bold mr-1">Liberado</span>
+                        )}
+                        {ord.paymentStatus === 'rechazado' && (
+                          <span className="text-red-400 text-[10px] font-mono mr-1">Cancelado</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSingleOrder(ord.id)}
+                          className="p-1 rounded bg-red-950/50 hover:bg-red-900 text-red-400 hover:text-white border border-red-800/60 transition-colors"
+                          title="Eliminar este pedido definitivamente del historial"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
+                {ordersList.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="py-12 text-center text-[#958da1]">
+                      No hay pedidos registrados en el historial actualmente.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

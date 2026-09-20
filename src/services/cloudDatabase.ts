@@ -324,11 +324,18 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void): (() => v
 };
 
 /**
- * Creates an order in Cloud and Local.
+ * Creates or updates an order in Cloud and Local.
  */
 export const cloudSubmitOrder = async (order: Order): Promise<{ success: boolean; error?: string }> => {
   const local = getStoredOrders();
-  saveLocalOrders([order, ...local]);
+  const existingIdx = local.findIndex(o => o.id === order.id);
+  let updatedLocal: Order[];
+  if (existingIdx >= 0) {
+    updatedLocal = local.map(o => o.id === order.id ? order : o);
+  } else {
+    updatedLocal = [order, ...local];
+  }
+  saveLocalOrders(updatedLocal);
 
   const db = getFirestoreInstance();
   if (db && isFirebaseConfigured()) {
@@ -337,6 +344,55 @@ export const cloudSubmitOrder = async (order: Order): Promise<{ success: boolean
       return { success: true };
     } catch (err: any) {
       console.error('Error saving order to Firebase:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true };
+};
+
+/**
+ * Deletes an order permanently from Cloud (Firestore) and LocalStorage.
+ */
+export const cloudDeleteOrder = async (orderId: string): Promise<{ success: boolean; error?: string }> => {
+  // 1. Delete from local storage immediately
+  const local = getStoredOrders();
+  const updatedLocal = local.filter(o => o.id !== orderId);
+  saveLocalOrders(updatedLocal);
+
+  // 2. Delete from Firestore if configured
+  const db = getFirestoreInstance();
+  if (db && isFirebaseConfigured()) {
+    try {
+      await deleteDoc(doc(db, 'orders', orderId));
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error deleting order from Firebase:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true };
+};
+
+/**
+ * Clears all orders from Cloud (Firestore) and LocalStorage.
+ */
+export const cloudClearAllOrders = async (): Promise<{ success: boolean; error?: string }> => {
+  // 1. Clear local
+  saveLocalOrders([]);
+
+  // 2. Clear Firestore
+  const db = getFirestoreInstance();
+  if (db && isFirebaseConfigured()) {
+    try {
+      const snap = await getDocs(collection(db, 'orders'));
+      const batch = writeBatch(db);
+      snap.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error clearing orders from Firebase:', err);
       return { success: false, error: err.message };
     }
   }

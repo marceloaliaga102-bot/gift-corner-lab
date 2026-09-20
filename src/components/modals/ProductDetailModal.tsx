@@ -13,12 +13,60 @@ interface ProductDetailModalProps {
   onOpenPreview3D?: () => void;
 }
 
+// Helper to parse and format video URLs for unblocked playback
+function getEmbedVideoInfo(url: string): { type: 'youtube' | 'video'; embedUrl: string } {
+  if (!url) return { type: 'video', embedUrl: '' };
+  const clean = url.trim();
+
+  // YouTube match (watch?v=, youtu.be/, shorts/, embed/)
+  const ytMatch = clean.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytMatch && ytMatch[1]) {
+    return {
+      type: 'youtube',
+      embedUrl: `https://www.youtube-nocookie.com/embed/${ytMatch[1]}?autoplay=0&rel=0&modestbranding=1`
+    };
+  }
+
+  // Google Drive: /view -> /preview
+  if (clean.includes('drive.google.com/file/d/')) {
+    const driveMatch = clean.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/i);
+    if (driveMatch && driveMatch[1]) {
+      return {
+        type: 'youtube',
+        embedUrl: `https://drive.google.com/file/d/${driveMatch[1]}/preview`
+      };
+    }
+  }
+
+  // Vimeo
+  const vimeoMatch = clean.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/([^\/]*)\/videos\/|album\/(\d+)\/video\/|video\/|)(\d+)/i);
+  if (vimeoMatch && vimeoMatch[3]) {
+    return {
+      type: 'youtube',
+      embedUrl: `https://player.vimeo.com/video/${vimeoMatch[3]}`
+    };
+  }
+
+  // Direct video file (MP4, WEBM, etc.)
+  return {
+    type: 'video',
+    embedUrl: clean
+  };
+}
+
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product,
   onClose,
   onAddToCart,
   onOpenPreview3D
 }) => {
+  React.useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, []);
+
   if (!product) return null;
 
   const isVirtual = product.productType === 'virtual' || product.category === 'virtuales';
@@ -26,8 +74,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isPorqueSi = product.category === 'porquesi';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xl animate-fadeIn overflow-y-auto">
-      <div className="relative w-full max-w-3xl rounded-3xl bg-[#191b23] border border-white/10 p-5 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh] my-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
+      <div className="relative w-full max-w-3xl rounded-3xl bg-[#191b23] border border-white/10 p-5 sm:p-7 shadow-2xl overflow-y-auto max-h-[86vh] sm:max-h-[88vh] flex flex-col">
         
         {/* Close Button */}
         <button
@@ -120,45 +168,49 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </p>
 
             {/* Video Preview if available */}
-            {product.videoUrl && (
-              <div className="p-3.5 rounded-2xl bg-[#10131a] border border-[#7c3aed]/30 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-[#d2bbff] flex items-center gap-1.5">
-                    <Video className="w-4 h-4 text-[#d2bbff]" /> Video Demostrativo
-                  </span>
-                  <a
-                    href={product.videoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[11px] text-[#4cd7f6] hover:underline flex items-center gap-1"
-                  >
-                    <span>Ver en fuente</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-                {product.videoUrl.includes('youtube.com') || product.videoUrl.includes('youtu.be') ? (
-                  <div className="w-full aspect-video rounded-xl overflow-hidden bg-black">
-                    <iframe
-                      src={product.videoUrl.replace('watch?v=', 'embed/')}
-                      title={product.name}
-                      className="w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
+            {product.videoUrl && (() => {
+              const videoInfo = getEmbedVideoInfo(product.videoUrl);
+              return (
+                <div className="p-3.5 rounded-2xl bg-[#10131a] border border-[#7c3aed]/30 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-[#d2bbff] flex items-center gap-1.5">
+                      <Video className="w-4 h-4 text-[#d2bbff]" /> Video Demostrativo
+                    </span>
+                    <a
+                      href={product.videoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[11px] text-[#4cd7f6] hover:underline flex items-center gap-1"
+                    >
+                      <span>Abrir en enlace externo</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
-                ) : (
-                  <a
-                    href={product.videoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="py-2 px-3 rounded-xl bg-[#272a32] text-xs text-[#e1e2ec] flex items-center justify-center gap-2 hover:bg-[#32353d]"
-                  >
-                    <PlayCircle className="w-4 h-4 text-[#d2bbff]" />
-                    <span>Reproducir Video en Nueva Pestaña</span>
-                  </a>
-                )}
-              </div>
-            )}
+
+                  <div className="w-full aspect-video rounded-xl overflow-hidden bg-black border border-white/10 shadow-inner relative">
+                    {videoInfo.type === 'youtube' ? (
+                      <iframe
+                        src={videoInfo.embedUrl}
+                        title={product.name}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowFullScreen
+                        referrerPolicy="strict-origin-when-cross-origin"
+                      />
+                    ) : (
+                      <video
+                        src={videoInfo.embedUrl}
+                        controls
+                        playsInline
+                        className="w-full h-full object-contain bg-black"
+                      >
+                        Tu navegador no soporta reproducción directa de video.
+                      </video>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Downloadable Attachment Notice if available (Virtual) */}
             {product.downloadFile && (

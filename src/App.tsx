@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Product, ProductCategory, CartItem, Order, AppView, User } from './types';
 import { PRODUCTS, INITIAL_CART_ITEMS } from './data/products';
 import { Header } from './components/Header';
@@ -29,7 +30,9 @@ import {
   cloudDeleteProduct, 
   cloudUpdateStock, 
   subscribeToOrders, 
-  cloudSubmitOrder 
+  cloudSubmitOrder,
+  cloudDeleteOrder,
+  cloudClearAllOrders
 } from './services/cloudDatabase';
 import { isFirebaseConfigured } from './services/firebaseConfig';
 import { sfx } from './utils/audio';
@@ -195,10 +198,30 @@ export default function App() {
     window.open(`https://wa.me/51921617882?text=${msg}`, '_blank');
   };
 
+  // Order management: delete, clear and update in state, storage, and cloud
+  const handleDeleteOrder = async (orderId: string) => {
+    const updatedOrders = orders.filter(o => o.id !== orderId);
+    setOrders(updatedOrders);
+    saveOrders(updatedOrders);
+    await cloudDeleteOrder(orderId);
+  };
+
+  const handleClearAllOrders = async () => {
+    setOrders([]);
+    saveOrders([]);
+    await cloudClearAllOrders();
+  };
+
+  const handleUpdateOrder = (updatedOrder: Order) => {
+    const updated = orders.map(o => o.id === updatedOrder.id ? updatedOrder : o);
+    setOrders(updated);
+    saveOrders(updated);
+  };
+
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="min-h-screen bg-black/40 backdrop-blur-[1px] text-[#e1e2ec] font-body flex flex-col selection:bg-[#7c3aed] selection:text-white">
+    <div className="min-h-screen bg-black/40 text-[#e1e2ec] font-body flex flex-col selection:bg-[#7c3aed] selection:text-white">
       {/* Top Header Navigation */}
       <Header
         currentView={currentView}
@@ -298,6 +321,9 @@ export default function App() {
             onRequestLoginCreator={() => handleOpenAuth('login')}
             onLogoutCreator={handleLogout}
             isCloudActive={isCloudActive}
+            onDeleteOrder={handleDeleteOrder}
+            onClearAllOrders={handleClearAllOrders}
+            onUpdateOrder={handleUpdateOrder}
           />
         )}
 
@@ -309,6 +335,7 @@ export default function App() {
             onOpenPreview3D={() => setPreview3DOpen(true)}
             onOpenAuthModal={handleOpenAuth}
             onLogout={handleLogout}
+            onDeleteOrder={handleDeleteOrder}
           />
         )}
       </main>
@@ -334,8 +361,8 @@ export default function App() {
         </button>
       </div>
 
-      {/* Mobile Cart Drawer Overlay */}
-      {mobileCartOpen && (
+      {/* Mobile Cart Drawer Overlay (Mounted via Portal to avoid any container clipping) */}
+      {mobileCartOpen && createPortal(
         <div className="lg:hidden fixed inset-0 z-50 flex justify-end bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="w-full max-w-md h-full bg-[#10131a] p-4 overflow-y-auto flex flex-col justify-between">
             <div>
@@ -363,7 +390,8 @@ export default function App() {
               />
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Footer */}
@@ -381,39 +409,48 @@ export default function App() {
         onOpenWhatsApp={handleOpenWhatsApp}
       />
 
-      {/* 3D Love Card Interactive Modal */}
-      <Preview3DModal
-        isOpen={preview3DOpen}
-        onClose={() => setPreview3DOpen(false)}
-        onAddToCart={() => {
-          const cuponera = products.find((p) => p.id === 'cuponera-amor-carta-3d');
-          if (cuponera) handleAddToCart(cuponera);
-        }}
-      />
+      {/* Modals mounted directly onto document.body to prevent any parent overflow or centering displacement */}
+      {createPortal(
+        <Preview3DModal
+          isOpen={preview3DOpen}
+          onClose={() => setPreview3DOpen(false)}
+          onAddToCart={() => {
+            const cuponera = products.find((p) => p.id === 'cuponera-amor-carta-3d');
+            if (cuponera) handleAddToCart(cuponera);
+          }}
+        />,
+        document.body
+      )}
 
-      {/* Checkout Modal */}
-      <CheckoutModal
-        isOpen={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        items={cart}
-        onOrderSuccess={handleOrderSuccess}
-      />
+      {createPortal(
+        <CheckoutModal
+          isOpen={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          items={cart}
+          onOrderSuccess={handleOrderSuccess}
+        />,
+        document.body
+      )}
 
-      {/* Product Detail Modal */}
-      <ProductDetailModal
-        product={detailProduct}
-        onClose={() => setDetailProduct(null)}
-        onAddToCart={handleAddToCart}
-        onOpenPreview3D={() => setPreview3DOpen(true)}
-      />
+      {createPortal(
+        <ProductDetailModal
+          product={detailProduct}
+          onClose={() => setDetailProduct(null)}
+          onAddToCart={handleAddToCart}
+          onOpenPreview3D={() => setPreview3DOpen(true)}
+        />,
+        document.body
+      )}
 
-      {/* Auth Modal (Login / Register / Creator Access) */}
-      <AuthModal
-        isOpen={authModalOpen}
-        onClose={() => setAuthModalOpen(false)}
-        onLoginSuccess={handleLoginSuccess}
-        initialMode={authModalMode}
-      />
+      {createPortal(
+        <AuthModal
+          isOpen={authModalOpen}
+          onClose={() => setAuthModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
+          initialMode={authModalMode}
+        />,
+        document.body
+      )}
     </div>
   );
 }
