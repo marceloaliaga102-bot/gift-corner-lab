@@ -82,8 +82,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [customerPhone, setCustomerPhone] = useState('');
   const [selectedPickupLocation, setSelectedPickupLocation] = useState<string>('');
   
-  // Payment methods: yape, efectivo
-  const [paymentMethod, setPaymentMethod] = useState<'yape' | 'efectivo' | 'pagoefectivo'>('yape');
+  // Payment method: Solo Yape activo por el momento
+  const [paymentMethod, setPaymentMethod] = useState<'yape'>('yape');
   
   // Yape Operation Number input
   const [yapeOpNumber, setYapeOpNumber] = useState('');
@@ -194,12 +194,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         discount,
         total,
         status: 'En preparación',
-        paymentMethod,
-        yapeOpNumber: paymentMethod === 'yape' ? yapeOpNumber.trim() : undefined,
-        pagoEfectivoCip: paymentMethod === 'pagoefectivo' ? `CIP-${Math.floor(100000 + Math.random() * 900000)}-${Math.floor(10 + Math.random() * 90)}` : undefined,
-        // Efectivo: liberado automáticamente (pago presencial confirmado en el momento)
-        // Yape y PagoEfectivo: pendiente hasta verificación manual del admin
-        paymentStatus: paymentMethod === 'efectivo' ? 'aprobado' : 'pendiente',
+        paymentMethod: 'yape',
+        yapeOpNumber: yapeOpNumber.trim(),
+        // Yape: queda pendiente hasta verificación en app por el admin
+        paymentStatus: 'pendiente',
         shippingAddress: hasPhysical ? `Punto de Recogida: ${currentPickup}` : undefined
       };
 
@@ -359,54 +357,43 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             )}
 
-              {/* Payment Method Selector — YAPE, EFECTIVO y PAGOEFECTIVO */}
+              {/* Payment Method Selector — YAPE (Activo) y PAGOEFECTIVO (Próximamente) */}
             <div className="flex flex-col gap-2.5">
-              <label className="text-xs text-[#958da1] font-semibold font-mono">Selecciona Método de Pago en Soles (S/.):</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs text-[#958da1] font-semibold font-mono">Método de Pago en Soles (S/.):</label>
+                <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Solo Yape disponible temporalmente
+                </span>
+              </div>
               
-              <div className="grid grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* YAPE - MÉTODO ACTIVO */}
                 <button
                   type="button"
                   onClick={() => { setPaymentMethod('yape'); sfx.playClick(); }}
-                  className={`p-3 rounded-xl border text-xs font-bold pixel-btn flex flex-col items-center gap-1.5 transition-all ${
-                    paymentMethod === 'yape'
-                      ? 'bg-[#7c3aed]/30 border-[#7c3aed] text-white'
-                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
-                  }`}
+                  className="p-3.5 rounded-xl border border-[#7c3aed] bg-[#7c3aed]/20 text-white text-xs font-bold pixel-btn flex flex-col items-center gap-1.5 transition-all relative shadow-lg shadow-[#7c3aed]/10 ring-1 ring-[#7c3aed]/50 text-center"
                 >
+                  <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                    Activo
+                  </span>
                   <QrCode className="w-6 h-6 text-[#d2bbff]" />
                   <span>YAPE</span>
-                  <span className="text-[10px] opacity-70 font-normal">Pago digital</span>
+                  <span className="text-[10px] text-[#d2bbff]/80 font-normal">Transferencia Directa</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => { setPaymentMethod('efectivo'); sfx.playClick(); }}
-                  className={`p-3 rounded-xl border text-xs font-bold pixel-btn flex flex-col items-center gap-1.5 transition-all ${
-                    paymentMethod === 'efectivo'
-                      ? 'bg-emerald-600/30 border-emerald-500 text-white'
-                      : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
-                  }`}
+                {/* PAGOEFECTIVO - PRÓXIMAMENTE */}
+                <div
+                  className="p-3.5 rounded-xl border border-white/5 bg-[#171a22]/70 text-[#717684] flex flex-col items-center gap-1.5 relative select-none opacity-60 cursor-not-allowed text-center"
+                  title="PagoEfectivo estará disponible próximamente"
                 >
-                  <Banknote className="w-6 h-6 text-emerald-400" />
-                  <span>Efectivo</span>
-                  <span className="text-[10px] opacity-70 font-normal">Presencial</span>
-                </button>
-
-                {paymentConfig.pagoEfectivoEnabled !== false && (
-                  <button
-                    type="button"
-                    onClick={() => { setPaymentMethod('pagoefectivo'); sfx.playClick(); }}
-                    className={`p-3 rounded-xl border text-xs font-bold pixel-btn flex flex-col items-center gap-1.5 transition-all ${
-                      paymentMethod === 'pagoefectivo'
-                        ? 'bg-orange-600/30 border-orange-500 text-white'
-                        : 'bg-[#272a32] border-white/10 text-[#ccc3d8] hover:border-white/25'
-                    }`}
-                  >
-                    <Banknote className="w-6 h-6 text-orange-400" />
-                    <span>PagoEfectivo</span>
-                    <span className="text-[10px] opacity-70 font-normal">CIP / Código</span>
-                  </button>
-                )}
+                  <span className="absolute -top-2 right-2 px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider">
+                    Próximamente
+                  </span>
+                  <Banknote className="w-6 h-6 text-orange-400/40" />
+                  <span className="font-bold text-xs text-[#958da1]">PagoEfectivo</span>
+                  <span className="text-[10px] text-[#717684]">Agentes y Bancos (CIP)</span>
+                </div>
               </div>
 
               {/* YAPE PAYMENT DETAILS BOX */}
@@ -443,56 +430,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
                 </div>
               )}
-
-              {/* EFECTIVO PAYMENT DETAILS BOX */}
-              {paymentMethod === 'efectivo' && (
-                <div className="p-3.5 rounded-xl bg-emerald-950/25 border border-emerald-500/40 flex flex-col gap-2.5 text-xs animate-fadeIn">
-                  <div className="flex items-center gap-2">
-                    <Banknote className="w-5 h-5 text-emerald-400 shrink-0" />
-                    <strong className="text-white font-semibold">Pago en Efectivo (Presencial)</strong>
-                  </div>
-                  <p className="text-[#ccc3d8] text-[11px] leading-relaxed">
-                    Paga en el momento de la entrega o recogida del producto. El pedido quedará <strong className="text-emerald-400">confirmado y liberado automáticamente</strong> al registrarse, ya que el pago se realiza de forma presencial y directa.
-                  </p>
-                  <div className="p-2.5 rounded-lg bg-emerald-900/30 border border-emerald-500/30 flex items-start gap-2">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                    <span className="text-emerald-300 text-[11px]">
-                      No requiere código de operación. El producto se libera al confirmar el pedido.
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* PAGOEFECTIVO PAYMENT DETAILS BOX */}
-              {paymentMethod === 'pagoefectivo' && (
-                <div className="p-3.5 rounded-xl bg-orange-950/25 border border-orange-500/40 flex flex-col gap-2.5 text-xs animate-fadeIn">
-                  <div className="flex items-center gap-2">
-                    <Banknote className="w-5 h-5 text-orange-400 shrink-0" />
-                    <strong className="text-white font-semibold">PagoEfectivo — Paga con Código CIP</strong>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-orange-900/20 border border-orange-500/30 text-center">
-                    <p className="text-[10px] text-orange-300 uppercase font-bold mb-1">Tu Código CIP de Pago</p>
-                    <p className="text-2xl font-mono font-bold text-white tracking-widest">
-                      {`CIP-${Math.floor(100000 + Math.random() * 900000)}-${Math.floor(10 + Math.random() * 90)}`}
-                    </p>
-                    <p className="text-[10px] text-orange-200 mt-1">Monto: <strong className="text-white font-mono">S/. {total.toFixed(2)}</strong></p>
-                  </div>
-
-                  <p className="text-[#ccc3d8] text-[11px] leading-relaxed">
-                    {paymentConfig.pagoEfectivoInstructions || 'Paga con tu código CIP en cualquier agente BCP, Interbank, Banco de la Nación, BBVA, CMAC, o en la app de tu banco.'}
-                  </p>
-
-                  <div className="p-2.5 rounded-lg bg-orange-900/30 border border-orange-500/30 flex items-start gap-2">
-                    <Lock className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-                    <span className="text-orange-300 text-[11px]">
-                      Tu pedido quedará <strong>pendiente</strong> hasta que el pago sea verificado por el administrador. Plazo máximo: 24 horas.
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* TRANSFER/MERCADOPAGO boxes removed — solo Yape, Efectivo y PagoEfectivo */}
             </div>
 
             {/* Resumen de Compra en Soles */}
