@@ -1251,7 +1251,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     onChange={(e) => setPaymentConfigState({ ...paymentConfig, yapeName: e.target.value })}
                     className="w-full bg-[#191b23] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed]"
                   />
-                  <span className="text-[10px] text-[#958da1] mt-1 block">Ejemplo: Marcelo Aliaga</span>
+                  <span className="text-[10px] text-[#958da1] mt-1 block">Ejemplo: Gift Corner Lab</span>
                 </div>
               </div>
 

@@ -2,8 +2,8 @@ import { PaymentConfig, Product, Order, User } from '../types';
 
 export const DEFAULT_PAYMENT_CONFIG: PaymentConfig = {
   yapePhone: '+51 921 617 882',
-  yapeName: 'Marcelo Aliaga',
-  yapeQrUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="%237c3aed"/><rect x="20" y="20" width="260" height="260" rx="20" fill="%23ffffff"/><text x="150" y="60" font-family="sans-serif" font-weight="bold" font-size="22" fill="%237c3aed" text-anchor="middle">YAPE - GIFT CORNER LAB</text><rect x="50" y="80" width="70" height="70" fill="%237c3aed"/><rect x="60" y="90" width="50" height="50" fill="%23ffffff"/><rect x="70" y="100" width="30" height="30" fill="%237c3aed"/><rect x="180" y="80" width="70" height="70" fill="%237c3aed"/><rect x="190" y="90" width="50" height="50" fill="%23ffffff"/><rect x="200" y="100" width="30" height="30" fill="%237c3aed"/><rect x="50" y="180" width="70" height="70" fill="%237c3aed"/><rect x="60" y="190" width="50" height="50" fill="%23ffffff"/><rect x="70" y="200" width="30" height="30" fill="%237c3aed"/><rect x="140" y="140" width="20" height="20" fill="%2303b5d3"/><rect x="180" y="180" width="40" height="40" fill="%237c3aed"/><text x="150" y="275" font-family="sans-serif" font-size="14" font-weight="bold" fill="%237c3aed" text-anchor="middle">Marcelo Aliaga • %2B51 921 617 882</text></svg>',
+  yapeName: 'Gift Corner Lab',
+  yapeQrUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300"><rect width="300" height="300" fill="%237c3aed"/><rect x="20" y="20" width="260" height="260" rx="20" fill="%23ffffff"/><text x="150" y="60" font-family="sans-serif" font-weight="bold" font-size="22" fill="%237c3aed" text-anchor="middle">YAPE - GIFT CORNER LAB</text><rect x="50" y="80" width="70" height="70" fill="%237c3aed"/><rect x="60" y="90" width="50" height="50" fill="%23ffffff"/><rect x="70" y="100" width="30" height="30" fill="%237c3aed"/><rect x="180" y="80" width="70" height="70" fill="%237c3aed"/><rect x="190" y="90" width="50" height="50" fill="%23ffffff"/><rect x="200" y="100" width="30" height="30" fill="%237c3aed"/><rect x="50" y="180" width="70" height="70" fill="%237c3aed"/><rect x="60" y="190" width="50" height="50" fill="%23ffffff"/><rect x="70" y="200" width="30" height="30" fill="%237c3aed"/><rect x="140" y="140" width="20" height="20" fill="%2303b5d3"/><rect x="180" y="180" width="40" height="40" fill="%237c3aed"/><text x="150" y="275" font-family="sans-serif" font-size="14" font-weight="bold" fill="%237c3aed" text-anchor="middle">Gift Corner Lab Oficial</text></svg>',
   mercadopagoPublicKey: 'APP_USR-789456123-DEMO-PUBLIC-KEY',
   stripePublicKey: 'pk_test_51GiftCornerLabDemoKey99',
   autoApproveYape: true
@@ -15,7 +15,11 @@ export function getPaymentConfig(): PaymentConfig {
   try {
     const raw = localStorage.getItem(PAYMENT_CONFIG_KEY);
     if (!raw) return DEFAULT_PAYMENT_CONFIG;
-    return { ...DEFAULT_PAYMENT_CONFIG, ...JSON.parse(raw) };
+    const parsed = { ...DEFAULT_PAYMENT_CONFIG, ...JSON.parse(raw) };
+    if (parsed.yapeName === 'Marcelo Aliaga' || !parsed.yapeName) {
+      parsed.yapeName = 'Gift Corner Lab';
+    }
+    return parsed;
   } catch (err) {
     console.error('Error reading payment config:', err);
     return DEFAULT_PAYMENT_CONFIG;

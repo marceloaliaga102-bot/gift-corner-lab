@@ -52,8 +52,8 @@ export default function App() {
       {
         id: 'GC-884102',
         date: '2026-09-18',
-        customerName: 'Marcelo Aliaga',
-        customerEmail: 'marceloaliaga102@gmail.com',
+        customerName: 'Cliente',
+        customerEmail: 'cliente@giftcornerlab.com',
         items: [
           { product: PRODUCTS[0], quantity: 1 },
           { product: PRODUCTS[3], quantity: 1 }

@@ -44,7 +44,7 @@ export const PRODUCTS: Product[] = [
   <div class="coupon">🎁 Cupón #1: Cena romántica sorpresa donde tú elijas</div>
   <div class="coupon">💆 Cupón #2: Sesión de masajes de 30 minutos sin interrupciones</div>
   <div class="coupon">🎬 Cupón #3: Noche de películas con palomitas y sin quejarse</div>
-  <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">Creado con amor por Marcelo Aliaga & Angely en Gift Corner Lab</p>
+  <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">Elaborado con amor en Gift Corner Lab</p>
 </div>
 </body>
 </html>`)

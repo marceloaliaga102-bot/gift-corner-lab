@@ -22,9 +22,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderSuccess
 }) => {
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig>(() => getPaymentConfig());
-  const [customerName, setCustomerName] = useState('Marcelo Aliaga');
-  const [customerEmail, setCustomerEmail] = useState('marceloaliaga102@gmail.com');
-  const [customerPhone, setCustomerPhone] = useState('+51 921 617 882');
+  const [customerName, setCustomerName] = useState('Cliente');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [selectedPickupLocation, setSelectedPickupLocation] = useState<string>('');
   
   // Payment methods: yape, card, mercadopago, transfer
@@ -37,7 +37,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
-  const [cardHolder, setCardHolder] = useState('Marcelo Aliaga');
+  const [cardHolder, setCardHolder] = useState('');
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
@@ -278,36 +278,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               )}
             </div>
 
-            {/* Datos de Facturación */}
-            <div className="p-3.5 rounded-xl bg-[#272a32]/60 border border-white/10 flex flex-col gap-2.5">
-              <h3 className="font-display text-xs font-bold text-[#4cd7f6] uppercase tracking-wider flex items-center gap-1.5">
-                <Mail className="w-4 h-4" /> Datos de Contacto
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Nombre Completo: *</label>
-                  <input
-                    type="text"
-                    required
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#7c3aed]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Correo Electrónico: *</label>
-                  <input
-                    type="email"
-                    required
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#7c3aed]"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Si es FÍSICO: Teléfono / WhatsApp y Punto de Recogida */}
+            {/* Si es FÍSICO: Punto de Recogida de Referencia */}
             {hasPhysical && (
               <div className="p-3.5 rounded-xl bg-[#272a32]/60 border border-[#03b5d3]/30 flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
@@ -319,31 +290,17 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Teléfono / WhatsApp: *</label>
-                    <input
-                      type="tel"
-                      required
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      placeholder="+51 921 617 882"
-                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#03b5d3] font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Punto de Entrega:</label>
-                    <select
-                      value={currentPickup}
-                      onChange={(e) => setSelectedPickupLocation(e.target.value)}
-                      className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#03b5d3]"
-                    >
-                      {allPickupLocations.map((loc, idx) => (
-                        <option key={idx} value={loc}>{loc}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="text-[11px] text-[#958da1] block mb-1 font-mono">Punto de Entrega para coordinar:</label>
+                  <select
+                    value={currentPickup}
+                    onChange={(e) => setSelectedPickupLocation(e.target.value)}
+                    className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-[#03b5d3]"
+                  >
+                    {allPickupLocations.map((loc, idx) => (
+                      <option key={idx} value={loc}>{loc}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
             )}
@@ -457,6 +414,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       <input
                         type="text"
                         required
+                        placeholder="Nombre como figura en la tarjeta"
                         value={cardHolder}
                         onChange={(e) => setCardHolder(e.target.value)}
                         className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none"
@@ -523,7 +481,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <strong className="text-white font-semibold">Transferencia Bancaria BCP / Interbank</strong>
                   </div>
                   <p className="text-[#ccc3d8] text-[11px] font-mono">
-                    BCP Soles: 191-9482019-0-42 • CCI: 002-191-009482019042-55 (Titular: Marcelo Aliaga)
+                    BCP Soles: 191-9482019-0-42 • CCI: 002-191-009482019042-55 (Titular: Gift Corner Lab)
                   </p>
                 </div>
               )}
@@ -767,7 +725,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   Punto de recogida seleccionado: <strong className="text-[#4cd7f6]">{currentPickup}</strong>.
                 </p>
                 <p>
-                  Al pagar, se abrirá WhatsApp con el código único de tu producto para acordar el encuentro con Marcelo &amp; Angely.
+                  Al pagar, se abrirá WhatsApp con el código único de tu producto para coordinar la entrega con Gift Corner Lab.
                 </p>
               </div>
 
