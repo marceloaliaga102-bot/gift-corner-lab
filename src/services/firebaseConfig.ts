@@ -34,6 +34,8 @@ const getEnvConfig = (): FirebaseConfigData | null => {
   return null;
 };
 
+import { SHARED_FIREBASE_CREDENTIALS } from './firebaseCredentials';
+
 // 2. Read from localStorage (allows Admin to configure directly from UI without rebuilds)
 export const getStoredFirebaseConfig = (): FirebaseConfigData | null => {
   try {
@@ -47,7 +49,17 @@ export const getStoredFirebaseConfig = (): FirebaseConfigData | null => {
   } catch (e) {
     console.warn('Error reading stored Firebase config:', e);
   }
-  return getEnvConfig();
+
+  // Check env config
+  const envConfig = getEnvConfig();
+  if (envConfig) return envConfig;
+
+  // Check shared credentials
+  if (SHARED_FIREBASE_CREDENTIALS.apiKey && SHARED_FIREBASE_CREDENTIALS.projectId && SHARED_FIREBASE_CREDENTIALS.appId) {
+    return SHARED_FIREBASE_CREDENTIALS;
+  }
+
+  return null;
 };
 
 export const saveStoredFirebaseConfig = (config: FirebaseConfigData | null): void => {

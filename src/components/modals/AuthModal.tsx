@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../../types';
 import { getStoredUsers, saveUser, setCurrentUser, CREATOR_CREDENTIALS } from '../../utils/storage';
+import { cloudSaveUser } from '../../services/cloudDatabase';
 import { X, Lock, User as UserIcon, Mail, ArrowRight, Sparkles, Check } from 'lucide-react';
 import { sfx } from '../../utils/audio';
 
@@ -100,7 +101,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         createdAt: new Date().toISOString().split('T')[0]
       };
 
-      saveUser(newUser);
+      cloudSaveUser(newUser);
       setCurrentUser(newUser);
       sfx.playChime();
       setSuccessMsg('¡Cuenta creada con éxito! Tu sesión se mantendrá activa.');

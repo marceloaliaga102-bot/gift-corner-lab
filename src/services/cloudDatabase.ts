@@ -15,12 +15,14 @@ import {
   FirebaseConfigData,
   initFirebase 
 } from './firebaseConfig';
-import { Product, Order, PaymentConfig } from '../types';
+import { Product, Order, PaymentConfig, User } from '../types';
 import { 
   getStoredProducts, 
   saveProducts as saveLocalProducts, 
   getStoredOrders, 
-  saveOrders as saveLocalOrders 
+  saveOrders as saveLocalOrders,
+  getStoredUsers,
+  saveUser as saveLocalUser
 } from '../utils/storage';
 import { getPaymentConfig, savePaymentConfig as saveLocalPaymentConfig } from '../utils/database';
 
@@ -70,19 +72,25 @@ export const subscribeToProducts = (onUpdate: (products: Product[]) => void): ((
       const unsubscribe = onSnapshot(
         productsCol,
         (snapshot) => {
-          if (!snapshot.empty) {
-            const list: Product[] = [];
-            snapshot.forEach((docSnap) => {
-              list.push(docSnap.data() as Product);
-            });
-            // Update local cache
-            saveLocalProducts(list);
-            onUpdate(list);
-          } else {
-            // Cloud collection is empty: Provide local products as starting state
-            const local = getStoredProducts();
-            onUpdate(local);
+          const list: Product[] = [];
+          snapshot.forEach((docSnap) => {
+            list.push(docSnap.data() as Product);
+          });
+
+          // If the cloud collection is brand new (first time setup)
+          if (snapshot.empty && localStorage.getItem('gc_cloud_seeded') !== 'true') {
+            localStorage.setItem('gc_cloud_seeded', 'true');
+            const initial = getStoredProducts();
+            if (initial && initial.length > 0) {
+              cloudBulkUploadProducts(initial);
+              onUpdate(initial);
+              return;
+            }
           }
+
+          localStorage.setItem('gc_cloud_seeded', 'true');
+          saveLocalProducts(list);
+          onUpdate(list);
         },
         (error) => {
           console.warn('Firestore products listener error, falling back to local:', error);
@@ -334,6 +342,57 @@ export const cloudSubmitOrder = async (order: Order): Promise<{ success: boolean
   }
 
   return { success: true };
+};
+
+/* ==========================================================================
+   USERS / CUSTOMER ACCOUNTS SYNCHRONIZATION
+   ========================================================================== */
+
+/**
+ * Saves a registered customer user to Cloud and LocalStorage.
+ */
+export const cloudSaveUser = async (user: User): Promise<void> => {
+  saveLocalUser(user);
+
+  const db = getFirestoreInstance();
+  if (db && isFirebaseConfigured()) {
+    try {
+      await setDoc(doc(db, 'users', user.id), user);
+    } catch (err) {
+      console.warn('Error saving user to Firebase:', err);
+    }
+  }
+};
+
+/**
+ * Subscribes to customer users in real time.
+ */
+export const subscribeToUsers = (onUpdate: (users: User[]) => void): (() => void) => {
+  const db = getFirestoreInstance();
+
+  if (db && isFirebaseConfigured()) {
+    try {
+      const usersCol = collection(db, 'users');
+      const unsubscribe = onSnapshot(
+        usersCol,
+        (snapshot) => {
+          const list: User[] = [];
+          snapshot.forEach((d) => list.push(d.data() as User));
+          if (list.length > 0) {
+            localStorage.setItem('gc_boutique_users', JSON.stringify(list));
+            onUpdate(list);
+          }
+        },
+        (err) => console.warn('Firestore users listener error:', err)
+      );
+      return unsubscribe;
+    } catch (e) {
+      console.warn('Error attaching users listener:', e);
+    }
+  }
+
+  onUpdate(getStoredUsers());
+  return () => {};
 };
 
 /* ==========================================================================

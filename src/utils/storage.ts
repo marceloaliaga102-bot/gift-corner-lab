@@ -79,12 +79,12 @@ export const setCurrentUser = (user: User | null): void => {
 export const getStoredProducts = (): Product[] => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-    if (!saved) {
+    if (saved === null) {
       localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(PRODUCTS));
       return PRODUCTS;
     }
     const parsed = JSON.parse(saved);
-    if (Array.isArray(parsed) && parsed.length > 0) {
+    if (Array.isArray(parsed)) {
       return parsed;
     }
     return PRODUCTS;
