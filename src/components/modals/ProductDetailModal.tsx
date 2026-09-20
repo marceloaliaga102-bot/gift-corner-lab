@@ -26,8 +26,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const isPorqueSi = product.category === 'porquesi';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
-      <div className="relative w-full max-w-3xl rounded-3xl bg-[#191b23] border border-white/10 p-6 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-xl animate-fadeIn overflow-y-auto">
+      <div className="relative w-full max-w-3xl rounded-3xl bg-[#191b23] border border-white/10 p-5 sm:p-8 shadow-2xl overflow-y-auto max-h-[90vh] my-auto">
         
         {/* Close Button */}
         <button

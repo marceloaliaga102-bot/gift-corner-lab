@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Pixelify Sans', cursive, sans-serif;
-  --font-display: 'Press Start 2P', 'Pixelify Sans', monospace;
-  --font-body: 'Pixelify Sans', cursive, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
 
   --color-surface: #10131a;
   --color-surface-dim: #10131a;
@@ -41,70 +41,68 @@ body {
   background-repeat: no-repeat;
   background-size: cover;
   color: #e1e2ec;
-  font-family: 'Pixelify Sans', cursive, sans-serif;
-  letter-spacing: 0.02em;
+  font-family: 'Inter', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6, .font-display {
-  font-family: 'Press Start 2P', 'Pixelify Sans', monospace;
+  font-family: 'Inter', system-ui, sans-serif;
   letter-spacing: -0.02em;
 }
 
-.font-pixel {
-  font-family: 'Press Start 2P', monospace;
-}
-
-.font-retro {
-  font-family: 'Pixelify Sans', cursive, sans-serif;
-}
-
-/* Pixel Art UI utilities */
+/* Utility classes kept for compatibility */
 .pixel-border {
-  box-shadow: 3px 3px 0px 0px rgba(0, 0, 0, 0.85);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .pixel-border-primary {
-  box-shadow: 3px 3px 0px 0px rgba(124, 58, 237, 0.9);
-  border: 2px solid #7c3aed;
+  box-shadow: 0 2px 12px rgba(124, 58, 237, 0.3);
+  border: 1px solid #7c3aed;
 }
 
 .pixel-border-cyan {
-  box-shadow: 3px 3px 0px 0px rgba(3, 181, 211, 0.9);
-  border: 2px solid #03b5d3;
+  box-shadow: 0 2px 12px rgba(3, 181, 211, 0.3);
+  border: 1px solid #03b5d3;
 }
 
 .pixel-btn {
-  transition: all 0.1s steps(2);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.7);
+  transition: all 0.15s ease;
 }
 
 .pixel-btn:active {
-  transform: translateY(3px);
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  transform: translateY(1px);
 }
 
 .pixel-badge {
-  font-family: 'Press Start 2P', monospace;
-  font-size: 8.5px;
-  letter-spacing: 0.5px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
   line-height: 1.4;
-  image-rendering: pixelated;
 }
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #0b0e15;
 }
 ::-webkit-scrollbar-thumb {
   background: #7c3aed;
-  border-radius: 0px;
-  border: 1px solid #10131a;
+  border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #4cd7f6;
+}
+
+/* Mobile fixes */
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
 }

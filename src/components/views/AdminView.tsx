@@ -4,7 +4,7 @@ import {
   ShieldCheck, Package, DollarSign, Users, AlertCircle, Plus, Edit, Check, 
   Trash2, Video, FileCode, Upload, Image as ImageIcon, Eye, X, Lock, Sparkles, Download,
   MapPin, Zap, Box, QrCode, CreditCard, Database, RefreshCw, Save, HardDrive, CheckCircle2,
-  Cloud, Globe, Wifi, WifiOff, ExternalLink, Copy, CheckCircle, AlertTriangle, ArrowUpRight
+  Cloud, Globe, Wifi, WifiOff, ExternalLink, Copy, CheckCircle, AlertTriangle, ArrowUpRight, Search
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
 import { 
@@ -57,6 +57,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [tempStock, setTempStock] = useState<number>(0);
+  const [productSearchQuery, setProductSearchQuery] = useState<string>('');
 
   useEffect(() => {
     setOrdersList(orders);
@@ -589,70 +590,70 @@ export const AdminView: React.FC<AdminViewProps> = ({
       </div>
 
       {/* Navigation Tabs (Productos, Config de Pagos & Yape, Nube Multidispositivo, Base de Datos) */}
-      <div className="flex items-center gap-2 p-1.5 bg-[#191b23] rounded-2xl border border-white/10 overflow-x-auto">
+      <div className="flex items-center gap-2 p-1.5 bg-[#191b23] rounded-2xl border border-white/10 overflow-x-auto scrollbar-none">
         <button
           type="button"
           onClick={() => { setActiveTab('products'); sfx.playClick(); }}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
             activeTab === 'products'
               ? 'bg-[#7c3aed] text-white shadow-md'
               : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
           }`}
         >
-          <Package className="w-4 h-4" />
+          <Package className="w-4 h-4 shrink-0" />
           <span>Gestión de Productos ({products.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setActiveTab('orders'); sfx.playClick(); }}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
             activeTab === 'orders'
               ? 'bg-[#7c3aed] text-white shadow-md'
               : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
           }`}
         >
-          <Box className="w-4 h-4" />
+          <Box className="w-4 h-4 shrink-0" />
           <span>Órdenes &amp; Pagos ({ordersList.length})</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setActiveTab('cloud_sync'); sfx.playClick(); }}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
             activeTab === 'cloud_sync'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
               : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
           }`}
         >
-          <Cloud className="w-4 h-4" />
-          <span>Sincronización Nube (Multidispositivo) {isCloudConfiguredState ? '🟢' : '🟠'}</span>
+          <Cloud className="w-4 h-4 shrink-0" />
+          <span>Sincronización Nube {isCloudConfiguredState ? '🟢' : '🟠'}</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setActiveTab('payment_config'); sfx.playClick(); }}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
             activeTab === 'payment_config'
               ? 'bg-[#03b5d3] text-[#001f26] shadow-md'
               : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
           }`}
         >
-          <QrCode className="w-4 h-4" />
-          <span>Ajustes de Yape &amp; Pasarelas Reales</span>
+          <QrCode className="w-4 h-4 shrink-0" />
+          <span>Ajustes de Yape &amp; Pasarelas</span>
         </button>
 
         <button
           type="button"
           onClick={() => { setActiveTab('database'); sfx.playClick(); }}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
             activeTab === 'database'
               ? 'bg-[#c81a42] text-white shadow-md'
               : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
           }`}
         >
-          <Database className="w-4 h-4" />
-          <span>Base de Datos Local ({dbStats.mbUsed} MB)</span>
+          <Database className="w-4 h-4 shrink-0" />
+          <span>Base de Datos ({dbStats.mbUsed} MB)</span>
         </button>
       </div>
 
@@ -970,8 +971,35 @@ export const AdminView: React.FC<AdminViewProps> = ({
           )}
 
           {/* PRODUCTS TABLE */}
-          <div className="p-6 rounded-3xl bg-[#191b23]/80 border border-white/5 shadow-xl flex flex-col gap-4">
-            <h2 className="font-display text-lg font-bold text-[#e1e2ec]">Gestión de Productos en Catálogo</h2>
+          <div className="p-4 sm:p-6 rounded-3xl bg-[#191b23]/80 border border-white/5 shadow-xl flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-display text-base sm:text-lg font-bold text-[#e1e2ec]">Gestión de Productos en Catálogo</h2>
+                <p className="text-xs text-[#958da1]">Busca cualquier producto por su código único (ej: GCL-VIR-...) o nombre</p>
+              </div>
+
+              {/* SEARCH BAR */}
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 text-[#958da1] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Buscar por código (SKU) o nombre..."
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  className="w-full bg-[#10131a] text-white text-xs pl-9 pr-8 py-2.5 rounded-xl border border-white/10 focus:border-[#7c3aed] focus:outline-none transition-colors"
+                />
+                {productSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setProductSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#958da1] hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs text-[#ccc3d8]">
                 <thead className="text-[11px] text-[#958da1] uppercase border-b border-white/10">
@@ -985,7 +1013,17 @@ export const AdminView: React.FC<AdminViewProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {products.map((p) => (
+                  {products
+                    .filter((p) => {
+                      if (!productSearchQuery.trim()) return true;
+                      const q = productSearchQuery.toLowerCase().trim();
+                      return (
+                        (p.code && p.code.toLowerCase().includes(q)) ||
+                        (p.name && p.name.toLowerCase().includes(q)) ||
+                        (p.category && p.category.toLowerCase().includes(q))
+                      );
+                    })
+                    .map((p) => (
                     <tr key={p.id} className="hover:bg-white/5 transition-colors">
                       <td className="py-3 px-2 font-mono text-[#4cd7f6] font-bold">
                         {p.code || 'GCL-00'}
@@ -1047,6 +1085,21 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       </td>
                     </tr>
                   ))}
+                  {products.filter((p) => {
+                    if (!productSearchQuery.trim()) return true;
+                    const q = productSearchQuery.toLowerCase().trim();
+                    return (
+                      (p.code && p.code.toLowerCase().includes(q)) ||
+                      (p.name && p.name.toLowerCase().includes(q)) ||
+                      (p.category && p.category.toLowerCase().includes(q))
+                    );
+                  }).length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-[#958da1]">
+                        No se encontraron productos con el código o nombre "{productSearchQuery}".
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

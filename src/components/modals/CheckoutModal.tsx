@@ -42,6 +42,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [completedOrder, setCompletedOrder] = useState<Order | null>(null);
   const [activeItemsSnapshot, setActiveItemsSnapshot] = useState<CartItem[]>([]);
+  const modalRef = React.useRef<HTMLDivElement>(null);
 
   // Pre-payment physical notice state
   const [showPhysicalNoticeModal, setShowPhysicalNoticeModal] = useState(false);
@@ -142,6 +143,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setCompletedOrder(newOrder);
       onOrderSuccess(newOrder);
       setIsProcessing(false);
+      // Scroll modal to top so user sees confirmation immediately
+      setTimeout(() => {
+        if (modalRef.current) {
+          modalRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
     }, 1200);
   };
 
@@ -215,8 +222,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl animate-fadeIn">
-      <div className="relative w-full max-w-2xl rounded-2xl bg-[#191b23]/95 border border-white/10 p-5 sm:p-7 shadow-2xl overflow-y-auto max-h-[90vh] pixel-border">
+    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-xl animate-fadeIn overflow-y-auto">
+      <div ref={modalRef} className="relative w-full max-w-2xl rounded-2xl bg-[#191b23]/95 border border-white/10 p-4 sm:p-6 shadow-2xl overflow-y-auto max-h-[92vh] my-auto">
         
         {/* Close Button */}
         <button
@@ -556,13 +563,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </form>
         ) : (
           /* ================= ORDER CONFIRMATION & POST-PAYMENT SCREEN ================= */
-          <div className="flex flex-col items-center text-center py-4 gap-4 animate-fadeIn">
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg ${
+          <div className="flex flex-col items-center text-center py-2 sm:py-4 gap-3 sm:gap-4 animate-fadeIn">
+            <div className={`w-11 h-11 sm:w-14 sm:h-14 rounded-full flex items-center justify-center shadow-lg ${
               completedOrder.paymentStatus === 'aprobado' 
                 ? 'bg-emerald-500/20 text-emerald-400' 
                 : 'bg-amber-500/20 text-amber-300'
             }`}>
-              {completedOrder.paymentStatus === 'aprobado' ? <CheckCircle className="w-8 h-8" /> : <Lock className="w-8 h-8" />}
+              {completedOrder.paymentStatus === 'aprobado' ? <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8" /> : <Lock className="w-6 h-6 sm:w-8 sm:h-8" />}
             </div>
 
             <div>
@@ -581,7 +588,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </>
                 )}
               </div>
-              <h2 className="font-display text-xl sm:text-2xl font-bold text-white">
+              <h2 className="font-display text-base sm:text-xl font-bold text-white">
                 {completedOrder.paymentStatus === 'aprobado' 
                   ? '¡Gracias por tu compra en Gift Corner Lab!' 
                   : 'Pedido Registrado - Verificación en Proceso'}
@@ -730,7 +737,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 rounded-xl bg-[#7c3aed] text-white font-display text-xs font-bold shadow-md hover:bg-[#732ee4] pixel-btn transition-colors"
+              className="px-5 py-2 rounded-xl bg-[#7c3aed] text-white font-display text-xs font-bold shadow-md hover:bg-[#732ee4] transition-colors"
             >
               Volver a la Tienda
             </button>
