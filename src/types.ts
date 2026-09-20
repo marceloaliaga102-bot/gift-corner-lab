@@ -72,6 +72,7 @@ export interface PaymentConfig {
 
 export interface Order {
   id: string;
+  createdAt?: number; // Timestamp numérico milisegundos para ordenamiento exacto
   date: string;
   customerName: string;
   customerEmail: string;

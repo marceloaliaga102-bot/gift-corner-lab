@@ -183,11 +183,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       sfx.playChime();
       const newOrder: Order = {
         id: `GC-${Math.floor(100000 + Math.random() * 900000)}`,
+        createdAt: Date.now(),
         date: new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' }),
         customerName: 'Cliente',
         customerEmail: '',
-        customerPhone: undefined,
-        pickupLocation: hasPhysical ? currentPickup : undefined,
         items: orderItems,
         subtotal,
         shipping,
@@ -198,7 +197,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         yapeOpNumber: yapeOpNumber.trim(),
         // Yape: queda pendiente hasta verificación en app por el admin
         paymentStatus: 'pendiente',
-        shippingAddress: hasPhysical ? `Punto de Recogida: ${currentPickup}` : undefined
+        ...(hasPhysical ? {
+          pickupLocation: currentPickup,
+          shippingAddress: `Punto de Recogida: ${currentPickup}`
+        } : {})
       };
 
       setCompletedOrder(newOrder);

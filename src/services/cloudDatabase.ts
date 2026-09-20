@@ -26,16 +26,39 @@ import {
 } from '../utils/storage';
 import { getPaymentConfig, savePaymentConfig as saveLocalPaymentConfig } from '../utils/database';
 
+// Deep sanitize helper to eliminate ANY undefined values or illegal Firestore types recursively
+export const deepSanitizeForFirestore = (obj: any): any => {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(item => deepSanitizeForFirestore(item)).filter(item => item !== undefined);
+  }
+  if (typeof obj === 'object') {
+    const sanitized: any = {};
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (val !== undefined) {
+        sanitized[key] = deepSanitizeForFirestore(val);
+      }
+    }
+    return sanitized;
+  }
+  return obj;
+};
+
+// Helper specifically for Orders to ensure 100% valid Firestore document
+export const sanitizeOrderForFirestore = (order: Order): any => {
+  const sanitized = deepSanitizeForFirestore(order);
+  if (!sanitized.createdAt) sanitized.createdAt = Date.now();
+  if (!sanitized.paymentStatus) sanitized.paymentStatus = 'pendiente';
+  if (!sanitized.status) sanitized.status = 'En preparación';
+  if (!sanitized.customerName) sanitized.customerName = 'Cliente';
+  if (sanitized.customerEmail === undefined) sanitized.customerEmail = '';
+  return sanitized;
+};
+
 // Helper to remove any undefined fields or oversized binary blobs that exceed Firestore's 1MB limit
 const sanitizeProductForFirestore = (prod: Product): any => {
-  const sanitized: any = { ...prod };
-  
-  // Remove undefined values
-  Object.keys(sanitized).forEach(key => {
-    if (sanitized[key] === undefined) {
-      delete sanitized[key];
-    }
-  });
+  const sanitized = deepSanitizeForFirestore(prod);
 
   // If download file has an excessively large dataUrl (> 600KB), strip the dataUrl for cloud sync
   // and preserve the metadata so the document doesn't exceed Firestore's 1MB limit.
@@ -295,6 +318,57 @@ export const cloudSavePaymentConfig = async (config: PaymentConfig): Promise<{ s
 export const subscribeToOrders = (onUpdate: (orders: Order[]) => void): (() => void) => {
   const db = getFirestoreInstance();
 
+  // Helper to merge local orders with cloud orders safely so newly created local orders are NEVER lost
+  const handleIncomingOrders = (cloudOrders: Order[]) => {
+    const local = getStoredOrders();
+    const map = new Map<string, Order>();
+
+    // 1. Seed with local orders first
+    local.forEach(o => { if (o && o.id) map.set(o.id, o); });
+
+    // 2. Merge cloud orders (ensuring latest paymentStatus & details)
+    cloudOrders.forEach(co => {
+      if (co && co.id) {
+        const existing = map.get(co.id);
+        if (!existing) {
+          map.set(co.id, co);
+        } else {
+          map.set(co.id, { ...existing, ...co });
+        }
+      }
+    });
+
+    const merged = Array.from(map.values());
+    merged.sort((a, b) => {
+      const timeA = a.createdAt || (a.date ? new Date(a.date).getTime() : 0) || 0;
+      const timeB = b.createdAt || (b.date ? new Date(b.date).getTime() : 0) || 0;
+      return timeB - timeA;
+    });
+
+    saveLocalOrders(merged);
+    onUpdate(merged);
+  };
+
+  // Cross-tab storage synchronization
+  const handleStorageEvent = (e: StorageEvent) => {
+    if (e.key === 'gift_corner_orders') {
+      try {
+        const fresh = e.newValue ? JSON.parse(e.newValue) : [];
+        if (Array.isArray(fresh)) {
+          fresh.sort((a: Order, b: Order) => {
+            const timeA = a.createdAt || (a.date ? new Date(a.date).getTime() : 0) || 0;
+            const timeB = b.createdAt || (b.date ? new Date(b.date).getTime() : 0) || 0;
+            return timeB - timeA;
+          });
+          onUpdate(fresh);
+        }
+      } catch (err) {
+        console.warn('Error reading fresh orders from storage event:', err);
+      }
+    }
+  };
+  window.addEventListener('storage', handleStorageEvent);
+
   if (db && isFirebaseConfigured()) {
     try {
       const ordersCol = collection(db, 'orders');
@@ -302,45 +376,64 @@ export const subscribeToOrders = (onUpdate: (orders: Order[]) => void): (() => v
         ordersCol,
         (snapshot) => {
           const list: Order[] = [];
-          snapshot.forEach((d) => list.push(d.data() as Order));
-          // Sort descending by date
-          list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          saveLocalOrders(list);
-          onUpdate(list);
+          snapshot.forEach((d) => {
+            const data = d.data() as Order;
+            if (data && data.id) {
+              list.push(data);
+            }
+          });
+          handleIncomingOrders(list);
         },
         (error) => {
           console.warn('Firestore orders listener error:', error);
           onUpdate(getStoredOrders());
         }
       );
-      return unsubscribe;
+      return () => {
+        unsubscribe();
+        window.removeEventListener('storage', handleStorageEvent);
+      };
     } catch (err) {
       console.error('Error attaching orders listener:', err);
     }
   }
 
   onUpdate(getStoredOrders());
-  return () => {};
+  return () => {
+    window.removeEventListener('storage', handleStorageEvent);
+  };
 };
 
 /**
  * Creates or updates an order in Cloud and Local.
  */
 export const cloudSubmitOrder = async (order: Order): Promise<{ success: boolean; error?: string }> => {
+  const completeOrder: Order = {
+    ...order,
+    createdAt: order.createdAt || Date.now(),
+    paymentStatus: order.paymentStatus || 'pendiente'
+  };
+
   const local = getStoredOrders();
-  const existingIdx = local.findIndex(o => o.id === order.id);
+  const existingIdx = local.findIndex(o => o.id === completeOrder.id);
   let updatedLocal: Order[];
   if (existingIdx >= 0) {
-    updatedLocal = local.map(o => o.id === order.id ? order : o);
+    updatedLocal = local.map(o => o.id === completeOrder.id ? completeOrder : o);
   } else {
-    updatedLocal = [order, ...local];
+    updatedLocal = [completeOrder, ...local];
   }
+  updatedLocal.sort((a, b) => {
+    const timeA = a.createdAt || (a.date ? new Date(a.date).getTime() : 0) || 0;
+    const timeB = b.createdAt || (b.date ? new Date(b.date).getTime() : 0) || 0;
+    return timeB - timeA;
+  });
   saveLocalOrders(updatedLocal);
 
   const db = getFirestoreInstance();
   if (db && isFirebaseConfigured()) {
     try {
-      await setDoc(doc(db, 'orders', order.id), order);
+      const sanitized = sanitizeOrderForFirestore(completeOrder);
+      await setDoc(doc(db, 'orders', completeOrder.id), sanitized);
       return { success: true };
     } catch (err: any) {
       console.error('Error saving order to Firebase:', err);

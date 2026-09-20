@@ -71,7 +71,7 @@ export default function App() {
   // Subscribe to live orders from the Cloud
   useEffect(() => {
     const unsubscribe = subscribeToOrders((liveOrders) => {
-      if (liveOrders && liveOrders.length > 0) {
+      if (liveOrders) {
         setOrders(liveOrders);
       }
     });
@@ -163,9 +163,19 @@ export default function App() {
       newOrder.customerName = currentUser.name;
       newOrder.customerEmail = currentUser.email;
     }
-    const updatedOrders = [newOrder, ...orders];
-    setOrders(updatedOrders);
-    saveOrders(updatedOrders);
+    if (!newOrder.createdAt) {
+      newOrder.createdAt = Date.now();
+    }
+    if (!newOrder.paymentStatus) {
+      newOrder.paymentStatus = 'pendiente';
+    }
+
+    setOrders((prev) => {
+      const filtered = prev.filter(o => o.id !== newOrder.id);
+      const updated = [newOrder, ...filtered];
+      saveOrders(updated);
+      return updated;
+    });
     setCart([]);
     await cloudSubmitOrder(newOrder);
   };
@@ -178,9 +188,11 @@ export default function App() {
 
   // Order management: delete, clear and update in state, storage, and cloud
   const handleDeleteOrder = async (orderId: string) => {
-    const updatedOrders = orders.filter(o => o.id !== orderId);
-    setOrders(updatedOrders);
-    saveOrders(updatedOrders);
+    setOrders((prev) => {
+      const updated = prev.filter(o => o.id !== orderId);
+      saveOrders(updated);
+      return updated;
+    });
     await cloudDeleteOrder(orderId);
   };
 
@@ -191,9 +203,11 @@ export default function App() {
   };
 
   const handleUpdateOrder = (updatedOrder: Order) => {
-    const updated = orders.map(o => o.id === updatedOrder.id ? updatedOrder : o);
-    setOrders(updated);
-    saveOrders(updated);
+    setOrders((prev) => {
+      const updated = prev.map(o => o.id === updatedOrder.id ? updatedOrder : o);
+      saveOrders(updated);
+      return updated;
+    });
   };
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
