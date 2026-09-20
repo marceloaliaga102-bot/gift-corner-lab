@@ -1,0 +1,59 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', sans-serif;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+
+  --color-surface: #10131a;
+  --color-surface-dim: #10131a;
+  --color-surface-bright: #363941;
+  --color-surface-container-lowest: #0b0e15;
+  --color-surface-container-low: #191b23;
+  --color-surface-container: #1d1f27;
+  --color-surface-container-high: #272a32;
+  --color-surface-container-highest: #32353d;
+  --color-on-surface: #e1e2ec;
+  --color-on-surface-variant: #ccc3d8;
+  --color-primary: #d2bbff;
+  --color-primary-container: #7c3aed;
+  --color-on-primary: #3f008e;
+  --color-on-primary-container: #ede0ff;
+  --color-inverse-primary: #732ee4;
+  --color-secondary: #4cd7f6;
+  --color-secondary-container: #03b5d3;
+  --color-on-secondary: #003640;
+  --color-on-secondary-container: #00424e;
+  --color-tertiary: #ffb2b7;
+  --color-tertiary-container: #c81a42;
+  --color-on-tertiary: #67001b;
+  --color-on-tertiary-container: #ffdedf;
+  --color-outline: #958da1;
+  --color-outline-variant: #4a4455;
+  --color-background: #10131a;
+}
+
+body {
+  background-color: #10131a;
+  color: #e1e2ec;
+  font-family: 'Inter', sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #10131a;
+}
+::-webkit-scrollbar-thumb {
+  background: #272a32;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #32353d;
+}
