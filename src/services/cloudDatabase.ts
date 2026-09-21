@@ -759,6 +759,9 @@ export const subscribeToMusicConfig = (
         (snap) => {
           if (snap.exists()) {
             const data = snap.data() as MusicConfig;
+            if (!Array.isArray(data.playlist)) {
+              data.playlist = data.youtubeUrl ? [{ id: 'track-1', url: data.youtubeUrl, title: data.title || 'Canción 1' }] : [];
+            }
             saveStoredMusicConfig(data);
             onUpdate(data);
           } else {
@@ -783,12 +786,21 @@ export const subscribeToMusicConfig = (
 export const cloudSaveMusicConfig = async (
   config: MusicConfig
 ): Promise<{ success: boolean; error?: string }> => {
-  saveStoredMusicConfig(config);
+  const normalizedPlaylist = Array.isArray(config.playlist) ? config.playlist : [];
+  const primaryUrl = config.youtubeUrl || (normalizedPlaylist.length > 0 ? normalizedPlaylist[0].url : '');
+  
+  const normalizedConfig: MusicConfig = {
+    ...config,
+    youtubeUrl: primaryUrl,
+    playlist: normalizedPlaylist
+  };
+
+  saveStoredMusicConfig(normalizedConfig);
 
   const db = getFirestoreInstance();
   if (db && isFirebaseConfigured()) {
     try {
-      const sanitized = deepSanitizeForFirestore(config);
+      const sanitized = deepSanitizeForFirestore(normalizedConfig);
       await setDoc(doc(db, 'settings', 'music'), sanitized);
       return { success: true };
     } catch (err: any) {
@@ -799,3 +811,4 @@ export const cloudSaveMusicConfig = async (
 
   return { success: true };
 };
+

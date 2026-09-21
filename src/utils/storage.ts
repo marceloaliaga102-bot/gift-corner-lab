@@ -169,16 +169,22 @@ export const getStoredMusicConfig = (): MusicConfig => {
       return {
         enabled: false,
         youtubeUrl: '',
+        playlist: [],
         title: 'Música de Fondo Gift Corner',
         defaultVolume: 35,
         loop: true
       };
     }
-    return JSON.parse(saved);
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed.playlist)) {
+      parsed.playlist = parsed.youtubeUrl ? [{ id: 'track-1', url: parsed.youtubeUrl, title: parsed.title || 'Canción 1' }] : [];
+    }
+    return parsed;
   } catch {
     return {
       enabled: false,
       youtubeUrl: '',
+      playlist: [],
       title: 'Música de Fondo Gift Corner',
       defaultVolume: 35,
       loop: true

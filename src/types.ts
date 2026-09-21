@@ -35,9 +35,16 @@ export interface ProductRating {
   rating: number;
 }
 
+export interface PlaylistItem {
+  id: string;
+  url: string;
+  title?: string;
+}
+
 export interface MusicConfig {
   enabled: boolean;
   youtubeUrl: string;
+  playlist?: PlaylistItem[];
   title?: string;
   defaultVolume?: number; // 0 - 100
   loop?: boolean;

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Product, Order, ProductDownloadFile, PaymentConfig, MusicConfig } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { Product, Order, ProductDownloadFile, PaymentConfig, MusicConfig, PlaylistItem } from '../../types';
 import { 
   ShieldCheck, Package, DollarSign, Users, AlertCircle, Plus, Edit, Check, 
   Trash2, Video, FileCode, Upload, Image as ImageIcon, Eye, X, Lock, Sparkles, Download,
   MapPin, Zap, Box, QrCode, CreditCard, Database, RefreshCw, Save, HardDrive, CheckCircle2,
   Cloud, Globe, Wifi, WifiOff, ExternalLink, Copy, CheckCircle, AlertTriangle, ArrowUpRight, Search,
-  Music, Volume2, Play
+  Music, Volume2, Play, ChevronLeft, ChevronRight, LayoutGrid, ListMusic, ListPlus
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
 import { 
@@ -70,14 +70,130 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [tempStock, setTempStock] = useState<number>(0);
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
 
+  // Navigation Tabs Scroll & Wrap state
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const [wrapTabs, setWrapTabs] = useState<boolean>(false);
+  const [isDraggingTabs, setIsDraggingTabs] = useState<boolean>(false);
+  const [tabsStartX, setTabsStartX] = useState<number>(0);
+  const [tabsScrollLeft, setTabsScrollLeft] = useState<number>(0);
+
+  const scrollTabs = (offset: number) => {
+    if (tabsContainerRef.current) {
+      tabsContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
+
+  const handleTabsWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (tabsContainerRef.current && !wrapTabs && e.deltaY !== 0) {
+      tabsContainerRef.current.scrollLeft += e.deltaY;
+    }
+  };
+
+  const handleTabsMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (wrapTabs || !tabsContainerRef.current) return;
+    setIsDraggingTabs(true);
+    setTabsStartX(e.pageX - tabsContainerRef.current.offsetLeft);
+    setTabsScrollLeft(tabsContainerRef.current.scrollLeft);
+  };
+
+  const handleTabsMouseLeaveOrUp = () => {
+    setIsDraggingTabs(false);
+  };
+
+  const handleTabsMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isDraggingTabs || !tabsContainerRef.current || wrapTabs) return;
+    e.preventDefault();
+    const x = e.pageX - tabsContainerRef.current.offsetLeft;
+    const walk = (x - tabsStartX) * 1.5;
+    tabsContainerRef.current.scrollLeft = tabsScrollLeft - walk;
+  };
+
   // Background Music State
   const [musicConfig, setMusicConfig] = useState<MusicConfig>(() => getStoredMusicConfig());
   const [musicSaveStatus, setMusicSaveStatus] = useState<string>('');
   const [isSavingMusic, setIsSavingMusic] = useState<boolean>(false);
+  const [bulkMusicText, setBulkMusicText] = useState<string>('');
+  const [showBulkAdd, setShowBulkAdd] = useState<boolean>(false);
+
+  // Format / clean YouTube URL helper
+  const cleanYouTubeUrl = (url: string): string => {
+    let clean = (url || '').trim();
+    if (!clean) return '';
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = `https://${clean}`;
+    }
+    return clean;
+  };
+
+  const handleAddPlaylistItem = (urlToAdd?: string, titleToAdd?: string) => {
+    const list = Array.isArray(musicConfig.playlist) ? [...musicConfig.playlist] : [];
+    const newTrack: PlaylistItem = {
+      id: `track-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      url: cleanYouTubeUrl(urlToAdd || ''),
+      title: titleToAdd || `Canción ${list.length + 1}`
+    };
+    const updated = [...list, newTrack];
+    setMusicConfig({
+      ...musicConfig,
+      playlist: updated,
+      youtubeUrl: updated[0]?.url || ''
+    });
+    sfx.playClick();
+  };
+
+  const handleRemovePlaylistItem = (index: number) => {
+    const list = Array.isArray(musicConfig.playlist) ? [...musicConfig.playlist] : [];
+    const updated = list.filter((_, i) => i !== index);
+    setMusicConfig({
+      ...musicConfig,
+      playlist: updated,
+      youtubeUrl: updated[0]?.url || ''
+    });
+    sfx.playPop();
+  };
+
+  const handleUpdatePlaylistItem = (index: number, field: 'url' | 'title', value: string) => {
+    const list = Array.isArray(musicConfig.playlist) ? [...musicConfig.playlist] : [];
+    if (!list[index]) return;
+    list[index] = {
+      ...list[index],
+      [field]: field === 'url' ? cleanYouTubeUrl(value) : value
+    };
+    setMusicConfig({
+      ...musicConfig,
+      playlist: list,
+      youtubeUrl: list[0]?.url || ''
+    });
+  };
+
+  const handleBulkAddUrls = () => {
+    if (!bulkMusicText.trim()) return;
+    const lines = bulkMusicText.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+    const list = Array.isArray(musicConfig.playlist) ? [...musicConfig.playlist] : [];
+    const newItems: PlaylistItem[] = lines.map((l, i) => ({
+      id: `track-${Date.now()}-${i}`,
+      url: cleanYouTubeUrl(l),
+      title: `Canción ${list.length + i + 1}`
+    }));
+    const updated = [...list, ...newItems];
+    setMusicConfig({
+      ...musicConfig,
+      playlist: updated,
+      youtubeUrl: updated[0]?.url || ''
+    });
+    setBulkMusicText('');
+    setShowBulkAdd(false);
+    sfx.playChime();
+  };
 
   useEffect(() => {
     const unsub = subscribeToMusicConfig((config) => {
-      if (config) setMusicConfig(config);
+      if (config) {
+        if (!Array.isArray(config.playlist)) {
+          config.playlist = config.youtubeUrl ? [{ id: 'track-1', url: config.youtubeUrl, title: config.title || 'Canción 1' }] : [];
+        }
+        setMusicConfig(config);
+      }
     });
     return () => unsub();
   }, []);
@@ -86,9 +202,25 @@ export const AdminView: React.FC<AdminViewProps> = ({
     e.preventDefault();
     setIsSavingMusic(true);
     try {
-      await cloudSaveMusicConfig(musicConfig);
+      const cleanedPlaylist = (Array.isArray(musicConfig.playlist) ? musicConfig.playlist : [])
+        .map(t => ({
+          ...t,
+          url: cleanYouTubeUrl(t.url)
+        }))
+        .filter(t => t.url.length > 0);
+
+      const cleanedPrimaryUrl = cleanYouTubeUrl(musicConfig.youtubeUrl) || (cleanedPlaylist[0]?.url || '');
+
+      const finalConfig: MusicConfig = {
+        ...musicConfig,
+        youtubeUrl: cleanedPrimaryUrl,
+        playlist: cleanedPlaylist.length > 0 ? cleanedPlaylist : (cleanedPrimaryUrl ? [{ id: 'track-1', url: cleanedPrimaryUrl, title: musicConfig.title || 'Canción 1' }] : [])
+      };
+
+      await cloudSaveMusicConfig(finalConfig);
+      setMusicConfig(finalConfig);
       sfx.playChime();
-      setMusicSaveStatus('¡Configuración de música sincronizada con éxito para todos los clientes!');
+      setMusicSaveStatus(`¡Música guardada con éxito! ${finalConfig.playlist?.length || 1} canción(es) en la lista sincronizadas.`);
       setTimeout(() => setMusicSaveStatus(''), 5000);
     } catch {
       setMusicSaveStatus('Guardado en almacenamiento local.');
@@ -697,85 +829,121 @@ export const AdminView: React.FC<AdminViewProps> = ({
         </div>
       </div>
 
-      {/* Navigation Tabs (Productos, Config de Pagos & Yape, Nube Multidispositivo, Base de Datos) */}
-      <div className="flex items-center gap-2 p-1.5 bg-[#191b23] rounded-2xl border border-white/10 overflow-x-auto scrollbar-none">
-        <button
-          type="button"
-          onClick={() => { setActiveTab('products'); sfx.playClick(); }}
-          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
-            activeTab === 'products'
-              ? 'bg-[#7c3aed] text-white shadow-md'
-              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
-          }`}
-        >
-          <Package className="w-4 h-4 shrink-0" />
-          <span>Gestión de Productos ({products.length})</span>
-        </button>
+      {/* Navigation Tabs — scrollable + wrap toggle for PC accessibility */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Scroll Left Arrow (only when not wrapped) */}
+          {!wrapTabs && (
+            <button type="button" onClick={() => scrollTabs(-200)} className="p-1.5 rounded-lg bg-[#272a32] text-[#958da1] hover:text-white hover:bg-[#32353d] shrink-0 transition-colors" title="Desplazar pestañas a la izquierda">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
 
-        <button
-          type="button"
-          onClick={() => { setActiveTab('orders'); sfx.playClick(); }}
-          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
-            activeTab === 'orders'
-              ? 'bg-[#7c3aed] text-white shadow-md'
-              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
-          }`}
-        >
-          <Box className="w-4 h-4 shrink-0" />
-          <span>Órdenes &amp; Pagos ({ordersList.length})</span>
-        </button>
+          <div
+            ref={tabsContainerRef}
+            onWheel={handleTabsWheel}
+            onMouseDown={handleTabsMouseDown}
+            onMouseLeave={handleTabsMouseLeaveOrUp}
+            onMouseUp={handleTabsMouseLeaveOrUp}
+            onMouseMove={handleTabsMouseMove}
+            className={`${wrapTabs ? 'flex flex-wrap' : 'flex overflow-x-auto scrollbar-none'} items-center gap-2 p-1.5 bg-[#191b23] rounded-2xl border border-white/10 flex-1 select-none ${isDraggingTabs ? 'cursor-grabbing' : 'cursor-grab'}`}
+          >
+            <button
+              type="button"
+              onClick={() => { setActiveTab('products'); sfx.playClick(); }}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'products'
+                  ? 'bg-[#7c3aed] text-white shadow-md'
+                  : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+              }`}
+            >
+              <Package className="w-4 h-4 shrink-0" />
+              <span>Productos ({products.length})</span>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => { setActiveTab('cloud_sync'); sfx.playClick(); }}
-          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
-            activeTab === 'cloud_sync'
-              ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
-              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
-          }`}
-        >
-          <Cloud className="w-4 h-4 shrink-0" />
-          <span>Sincronización Nube {isCloudConfiguredState ? '🟢' : '🟠'}</span>
-        </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('orders'); sfx.playClick(); }}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'orders'
+                  ? 'bg-[#7c3aed] text-white shadow-md'
+                  : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+              }`}
+            >
+              <Box className="w-4 h-4 shrink-0" />
+              <span>Órdenes ({ordersList.length})</span>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => { setActiveTab('payment_config'); sfx.playClick(); }}
-          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
-            activeTab === 'payment_config'
-              ? 'bg-[#03b5d3] text-[#001f26] shadow-md'
-              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
-          }`}
-        >
-          <QrCode className="w-4 h-4 shrink-0" />
-          <span>Yape &amp; PagoEfectivo</span>
-        </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('cloud_sync'); sfx.playClick(); }}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'cloud_sync'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
+                  : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+              }`}
+            >
+              <Cloud className="w-4 h-4 shrink-0" />
+              <span>Nube {isCloudConfiguredState ? '🟢' : '🟠'}</span>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => { setActiveTab('database'); sfx.playClick(); }}
-          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
-            activeTab === 'database'
-              ? 'bg-[#c81a42] text-white shadow-md'
-              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
-          }`}
-        >
-          <Database className="w-4 h-4 shrink-0" />
-          <span>Base de Datos ({dbStats.mbUsed} MB)</span>
-        </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('payment_config'); sfx.playClick(); }}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'payment_config'
+                  ? 'bg-[#03b5d3] text-[#001f26] shadow-md'
+                  : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+              }`}
+            >
+              <QrCode className="w-4 h-4 shrink-0" />
+              <span>Yape</span>
+            </button>
 
-        <button
-          type="button"
-          onClick={() => { setActiveTab('music'); sfx.playClick(); }}
-          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
-            activeTab === 'music'
-              ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md'
-              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
-          }`}
-        >
-          <Music className="w-4 h-4 shrink-0" />
-          <span>Música de Fondo {musicConfig.enabled ? '🎶 (Activa)' : '🔇 (Off)'}</span>
-        </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('database'); sfx.playClick(); }}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'database'
+                  ? 'bg-[#c81a42] text-white shadow-md'
+                  : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+              }`}
+            >
+              <Database className="w-4 h-4 shrink-0" />
+              <span>BD ({dbStats.mbUsed} MB)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setActiveTab('music'); sfx.playClick(); }}
+              className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
+                activeTab === 'music'
+                  ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md'
+                  : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+              }`}
+            >
+              <Music className="w-4 h-4 shrink-0" />
+              <span>🎵 Música {musicConfig.enabled ? '🎶' : '🔇'}</span>
+            </button>
+          </div>
+
+          {/* Scroll Right Arrow (only when not wrapped) */}
+          {!wrapTabs && (
+            <button type="button" onClick={() => scrollTabs(200)} className="p-1.5 rounded-lg bg-[#272a32] text-[#958da1] hover:text-white hover:bg-[#32353d] shrink-0 transition-colors" title="Desplazar pestañas a la derecha">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Wrap / Expand Toggle */}
+          <button
+            type="button"
+            onClick={() => { setWrapTabs(!wrapTabs); sfx.playClick(); }}
+            className="p-1.5 rounded-lg bg-[#272a32] text-[#958da1] hover:text-white hover:bg-[#32353d] shrink-0 transition-colors"
+            title={wrapTabs ? 'Compactar pestañas en una fila' : 'Expandir todas las pestañas'}
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* ================= TAB 1: PRODUCT MANAGEMENT & CREATOR ================= */}
@@ -1962,29 +2130,11 @@ service cloud.firestore {
               </label>
             </div>
 
-            {/* YouTube URL input */}
+            {/* Music General Title */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-white flex items-center gap-2">
-                <ExternalLink className="w-4 h-4 text-pink-400" />
-                URL de YouTube (Video o Lista de Reproducción): *
-              </label>
-              <input
-                type="url"
-                required={musicConfig.enabled}
-                placeholder="https://www.youtube.com/watch?v=... o https://youtu.be/... o playlist"
-                value={musicConfig.youtubeUrl}
-                onChange={(e) => setMusicConfig({ ...musicConfig, youtubeUrl: e.target.value })}
-                className="w-full bg-[#10131a] text-xs sm:text-sm text-white px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 transition-colors"
-              />
-              <span className="text-[11px] text-[#958da1]">
-                💡 Puedes colocar el enlace de un video relajante (lofi, instrumental, ambient) o una playlist completa de YouTube.
-              </span>
-            </div>
-
-            {/* Music Title */}
-            <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-white">
-                Título o Nombre de la Canción / Ambiente:
+                <Music className="w-4 h-4 text-pink-400" />
+                Título del Ambiente / Reproductor:
               </label>
               <input
                 type="text"
@@ -1993,6 +2143,169 @@ service cloud.firestore {
                 onChange={(e) => setMusicConfig({ ...musicConfig, title: e.target.value })}
                 className="w-full bg-[#10131a] text-xs sm:text-sm text-white px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 transition-colors"
               />
+            </div>
+
+            {/* Custom Playlist Section */}
+            <div className="flex flex-col gap-4 p-4 sm:p-6 rounded-2xl bg-[#10131a] border border-white/10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-pink-500/20 text-pink-400">
+                    <ListMusic className="w-4 h-4" />
+                  </span>
+                  <div>
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      Lista de Reproducción Personalizada
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30">
+                        {musicConfig.playlist?.length || 0} {musicConfig.playlist?.length === 1 ? 'canción' : 'canciones'}
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-[#958da1]">
+                      Agrega varios videos o canciones de YouTube para reproducirlos secuencialmente a los visitantes.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleAddPlaylistItem()}
+                    className="px-3 py-1.5 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold flex items-center gap-1.5 border border-pink-500/30 transition-colors active:scale-95"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Canción</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowBulkAdd(!showBulkAdd)}
+                    className="px-3 py-1.5 rounded-xl bg-[#272a32] hover:bg-[#323640] text-zinc-300 text-xs font-semibold flex items-center gap-1.5 border border-white/10 transition-colors active:scale-95"
+                  >
+                    <ListPlus className="w-3.5 h-3.5" />
+                    <span>Pegar Múltiples</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bulk Add Textarea Panel */}
+              {showBulkAdd && (
+                <div className="p-4 rounded-xl bg-[#191b23] border border-pink-500/30 flex flex-col gap-3 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-pink-300 flex items-center gap-1.5">
+                      <ListPlus className="w-4 h-4" /> Agregar varias URLs de YouTube a la vez:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkAdd(false)}
+                      className="p-1 rounded-lg text-zinc-400 hover:text-white"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <textarea
+                    rows={3}
+                    placeholder="Pega las URLs de YouTube (una por línea o separadas por comas):&#10;https://www.youtube.com/watch?v=...&#10;https://youtu.be/..."
+                    value={bulkMusicText}
+                    onChange={(e) => setBulkMusicText(e.target.value)}
+                    className="w-full bg-[#10131a] text-xs text-white p-3 rounded-lg border border-white/10 focus:outline-none focus:border-pink-500 font-mono resize-y"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowBulkAdd(false)}
+                      className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleBulkAddUrls}
+                      disabled={!bulkMusicText.trim()}
+                      className="px-4 py-1.5 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white text-xs font-bold transition-all"
+                    >
+                      Añadir a la Playlist
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Tracks List */}
+              {(!musicConfig.playlist || musicConfig.playlist.length === 0) ? (
+                <div className="p-8 text-center rounded-xl bg-[#191b23]/50 border border-dashed border-white/10 flex flex-col items-center gap-2">
+                  <Music className="w-8 h-8 text-zinc-500 mb-1" />
+                  <span className="text-xs font-bold text-zinc-300">Tu lista de reproducción está vacía</span>
+                  <p className="text-[11px] text-zinc-500 max-w-sm">
+                    Haz clic en "Agregar Canción" o "Pegar Múltiples" para incorporar música de fondo a tu tienda.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleAddPlaylistItem()}
+                    className="mt-2 px-4 py-2 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-300 text-xs font-semibold flex items-center gap-1.5 border border-pink-500/30 transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Agregar Primera Canción</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5 max-h-[360px] overflow-y-auto pr-1">
+                  {musicConfig.playlist.map((track, idx) => (
+                    <div
+                      key={track.id || idx}
+                      className="p-3 rounded-xl bg-[#191b23] border border-white/5 hover:border-pink-500/20 transition-all flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 group"
+                    >
+                      {/* Track number */}
+                      <span className="w-7 h-7 rounded-lg bg-pink-500/10 text-pink-400 font-mono font-bold text-xs flex items-center justify-center shrink-0 border border-pink-500/20">
+                        {idx + 1}
+                      </span>
+
+                      {/* Title input */}
+                      <div className="flex-1 sm:max-w-[200px]">
+                        <input
+                          type="text"
+                          placeholder="Nombre o autor..."
+                          value={track.title || ''}
+                          onChange={(e) => handleUpdatePlaylistItem(idx, 'title', e.target.value)}
+                          className="w-full bg-[#10131a] text-xs text-white px-3 py-2 rounded-lg border border-white/10 focus:outline-none focus:border-pink-500 transition-colors"
+                        />
+                      </div>
+
+                      {/* URL input */}
+                      <div className="flex-1">
+                        <div className="relative flex items-center">
+                          <input
+                            type="url"
+                            required={musicConfig.enabled && idx === 0}
+                            placeholder="https://www.youtube.com/watch?v=... o https://youtu.be/..."
+                            value={track.url}
+                            onChange={(e) => handleUpdatePlaylistItem(idx, 'url', e.target.value)}
+                            className="w-full bg-[#10131a] text-xs font-mono text-pink-200 px-3 py-2 pr-8 rounded-lg border border-white/10 focus:outline-none focus:border-pink-500 transition-colors"
+                          />
+                          {track.url && (
+                            <a
+                              href={track.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="absolute right-2.5 text-zinc-500 hover:text-pink-400 transition-colors"
+                              title="Abrir enlace en YouTube"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Delete button */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePlaylistItem(idx)}
+                        className="p-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors self-end sm:self-center shrink-0"
+                        title="Eliminar canción de la lista"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Volume slider & Loop */}
