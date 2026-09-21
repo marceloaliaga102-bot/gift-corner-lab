@@ -103,17 +103,17 @@ export const AccountView: React.FC<AccountViewProps> = ({
       {/* Header Profile Card */}
       <div className="p-5 sm:p-7 rounded-2xl bg-[#191b23]/90 border border-white/10 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-5 pixel-border">
         <div className="flex items-center gap-4">
-          <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold font-display shadow-lg border border-white/15 ${
+          <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-lg font-bold font-display shadow-lg border border-white/15 ${
             isCreator ? 'bg-[#c81a42] text-[#ffdedf]' : 'bg-[#7c3aed] text-[#ede0ff]'
           }`}>
-            {currentUser.name.charAt(0).toUpperCase()}
+            {isCreator ? 'MyA' : currentUser.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[9px] pixel-badge uppercase mb-1 bg-emerald-500/20 text-emerald-400">
-              <ShieldCheck className="w-3 h-3" /> {isCreator ? 'Maestro Creador' : 'Cuenta Registrada'}
+              <ShieldCheck className="w-3 h-3" /> {isCreator ? 'Administrador' : 'Cuenta Registrada'}
             </div>
             <h1 className="font-display text-base sm:text-lg font-bold text-white">
-              {currentUser.name}
+              {isCreator ? 'MyA Administrador' : currentUser.name}
             </h1>
             <p className="text-xs text-[#958da1] font-mono">{currentUser.email}</p>
           </div>

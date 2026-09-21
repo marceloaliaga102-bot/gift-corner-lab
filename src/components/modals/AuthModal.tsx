@@ -50,7 +50,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if ((isEmailMatch || isUserMatch) && password === CREATOR_CREDENTIALS.password) {
         const creatorUser: User = {
           id: 'user-creator-marcelo',
-          name: CREATOR_CREDENTIALS.name,
+          name: 'MyA Administrador',
           email: CREATOR_CREDENTIALS.email,
           role: 'creator',
           createdAt: '2025-01-01'

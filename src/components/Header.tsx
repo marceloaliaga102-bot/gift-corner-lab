@@ -216,17 +216,17 @@ export const Header: React.FC<HeaderProps> = ({
                   }`}
                   id="user-session-btn"
                 >
-                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 font-bold text-xs ${
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 font-bold text-[11px] ${
                     isCreator ? 'bg-[#ffb2b7] text-[#67001b]' : 'bg-[#d2bbff] text-[#3f008e]'
                   }`}>
-                    {currentUser.name.charAt(0).toUpperCase()}
+                    {isCreator ? 'MyA' : currentUser.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="hidden md:flex flex-col text-left">
                     <span className="font-display text-xs font-bold leading-none truncate max-w-28">
-                      {currentUser.name}
+                      {isCreator ? 'MyA' : currentUser.name}
                     </span>
                     <span className="text-[10px] text-[#958da1] leading-none mt-0.5">
-                      {isCreator ? 'Creador' : 'Cliente'}
+                      {isCreator ? 'Administrador' : 'Cliente'}
                     </span>
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-[#958da1]" />
@@ -235,6 +235,12 @@ export const Header: React.FC<HeaderProps> = ({
                 {/* Dropdown Menu */}
                 {userDropdownOpen && (
                   <div className="absolute right-0 top-11 w-48 rounded-2xl bg-[#191b23] border border-white/10 shadow-2xl p-2 z-50 flex flex-col gap-1 animate-fadeIn">
+                    {isCreator && (
+                      <div className="px-3 py-1.5 border-b border-white/5 mb-1">
+                        <span className="text-xs font-bold text-[#ffdedf] block">MyA Administrador</span>
+                        <span className="text-[10px] text-[#958da1] block">Panel de Control</span>
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => {

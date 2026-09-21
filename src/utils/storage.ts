@@ -6,7 +6,7 @@ export const CREATOR_CREDENTIALS = {
   username: 'marcelo',
   email: 'marceloaliaga102@gmail.com',
   password: 'marcelo2025',
-  name: 'Marcelo Aliaga (Creador & Fundador)'
+  name: 'MyA Administrador'
 };
 
 const STORAGE_KEYS = {
@@ -20,7 +20,7 @@ const STORAGE_KEYS = {
 const defaultUsers: User[] = [
   {
     id: 'user-creator-marcelo',
-    name: CREATOR_CREDENTIALS.name,
+    name: 'MyA Administrador',
     email: CREATOR_CREDENTIALS.email,
     password: CREATOR_CREDENTIALS.password,
     role: 'creator',
@@ -36,8 +36,12 @@ export const getStoredUsers = (): User[] => {
       return defaultUsers;
     }
     const parsed = JSON.parse(saved);
-    // Ensure creator is present
-    if (!parsed.some((u: User) => u.email.toLowerCase() === CREATOR_CREDENTIALS.email.toLowerCase())) {
+    // Ensure creator is present and has updated name
+    const creatorIndex = parsed.findIndex((u: User) => u.email.toLowerCase() === CREATOR_CREDENTIALS.email.toLowerCase());
+    if (creatorIndex >= 0) {
+      parsed[creatorIndex].name = 'MyA Administrador';
+      localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(parsed));
+    } else {
       parsed.push(defaultUsers[0]);
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(parsed));
     }
@@ -62,7 +66,11 @@ export const getCurrentUser = (): User | null => {
   try {
     const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
     if (!saved) return null;
-    return JSON.parse(saved);
+    const user = JSON.parse(saved);
+    if (user && (user.role === 'creator' || user.email?.toLowerCase() === CREATOR_CREDENTIALS.email.toLowerCase())) {
+      user.name = 'MyA Administrador';
+    }
+    return user;
   } catch {
     return null;
   }

@@ -769,7 +769,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-[#191b23]/80 border border-white/5">
         <div>
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#c81a42]/30 text-[#ffdedf] text-xs font-bold mb-2 border border-[#ffb2b7]/20">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#ffb2b7]" /> Sesión Maestra: Marcelo Aliaga (Creador)
+            <ShieldCheck className="w-3.5 h-3.5 text-[#ffb2b7]" /> Sesión Maestra: MyA Administrador
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#e1e2ec]">
             Panel de Control de la Boutique
