@@ -1,4 +1,4 @@
-import { User, Product, Order } from '../types';
+import { User, Product, Order, ProductComment, ProductRating } from '../types';
 import { PRODUCTS } from '../data/products';
 
 // Default creator credentials
@@ -119,3 +119,39 @@ export const getStoredOrders = (): Order[] => {
 export const saveOrders = (orders: Order[]): void => {
   localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
 };
+
+export const getStoredComments = (productId: string): ProductComment[] => {
+  try {
+    const saved = localStorage.getItem(`gc_product_comments_${productId}`);
+    if (!saved) return [];
+    return JSON.parse(saved);
+  } catch {
+    return [];
+  }
+};
+
+export const saveStoredComment = (productId: string, comment: ProductComment): ProductComment[] => {
+  const existing = getStoredComments(productId);
+  const updated = [comment, ...existing];
+  localStorage.setItem(`gc_product_comments_${productId}`, JSON.stringify(updated));
+  return updated;
+};
+
+export const getStoredRatings = (productId: string): ProductRating[] => {
+  try {
+    const saved = localStorage.getItem(`gc_product_ratings_${productId}`);
+    if (!saved) return [];
+    return JSON.parse(saved);
+  } catch {
+    return [];
+  }
+};
+
+export const saveStoredRating = (productId: string, rating: ProductRating): ProductRating[] => {
+  const existing = getStoredRatings(productId);
+  const filtered = existing.filter(r => r.userId !== rating.userId);
+  const updated = [...filtered, rating];
+  localStorage.setItem(`gc_product_ratings_${productId}`, JSON.stringify(updated));
+  return updated;
+};
+

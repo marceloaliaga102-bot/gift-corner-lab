@@ -287,4 +287,4 @@ export const INITIAL_CART_ITEMS: CartItem[] = [
   { product: PRODUCTS[0], quantity: 1 } // Cuponera de Amor 3D (Virtual)
 ];
 
-export const LOGO_URL = 'https://lh3.googleusercontent.com/aida/AEtjO1WxWi_NSsuTNnxr-UlDMCa2UmLMPwOBdPSB7sqKuILYhzx5cPbeEjwQA-9XSRkuE16ub49pAz4ZqRok9N1aCv7YnAfdR5sTtsDSUWOQI8-Xfq3PBE_pgSETxahI1u44vqPDN6JrcQ10YWHAg8ncOE0tl5lXIbv_TQc0wdiaTmHsSxAQ6yxcQTpbYuD7d_-z6sGiSKxkjeGZnliBGlJZiXAiSgZuH0R_0_IyYC65WCbpZ2SB6SdYApgCGQQ';
+export const LOGO_URL = '/logo.png';

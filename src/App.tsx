@@ -16,6 +16,7 @@ import { Preview3DModal } from './components/modals/Preview3DModal';
 import { CheckoutModal } from './components/modals/CheckoutModal';
 import { ProductDetailModal } from './components/modals/ProductDetailModal';
 import { AuthModal } from './components/modals/AuthModal';
+import { GiftIntroOverlay } from './components/GiftIntroOverlay';
 import { 
   getStoredProducts, 
   saveProducts, 
@@ -427,9 +428,11 @@ export default function App() {
       {detailProduct && createPortal(
         <ProductDetailModal
           product={detailProduct}
+          currentUser={currentUser}
           onClose={() => setDetailProduct(null)}
           onAddToCart={handleAddToCart}
           onOpenPreview3D={() => setPreview3DOpen(true)}
+          onOpenAuthModal={() => handleOpenAuth('login')}
         />,
         document.body
       )}
@@ -443,6 +446,12 @@ export default function App() {
         />,
         document.body
       )}
+
+      {/* Interactive Gift Entrance Overlay */}
+      <GiftIntroOverlay
+        hasUser={!!currentUser}
+        onOpenRegister={() => handleOpenAuth('register')}
+      />
     </div>
   );
 }

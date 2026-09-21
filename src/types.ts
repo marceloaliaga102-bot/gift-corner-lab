@@ -17,12 +17,26 @@ export interface ProductDownloadFile {
   isHtml?: boolean;
 }
 
+export interface ProductComment {
+  id: string;
+  userName: string;
+  userEmail?: string;
+  rating: number; // 1-5
+  comment: string;
+  createdAt: string;
+}
+
+export interface ProductRating {
+  userId: string;
+  rating: number;
+}
+
 export interface Product {
   id: string;
   code: string;
   name: string;
   category: 'fisicos' | 'virtuales' | 'porquesi';
-  productType?: 'virtual' | 'fisico';
+  productType?: 'virtual' | 'fisico' | 'porquesi';
   price: number;
   originalPrice?: number;
   discountBadge?: string;
@@ -41,6 +55,8 @@ export interface Product {
   downloadFile?: ProductDownloadFile;
   pickupLocations?: string[];
   features: string[];
+  ratings?: ProductRating[];
+  comments?: ProductComment[];
 }
 
 export interface User {

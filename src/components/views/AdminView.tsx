@@ -71,8 +71,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
     setOrdersList(orders);
   }, [orders]);
 
-  const generateNewCode = (modality: 'virtual' | 'fisico') => {
-    const prefix = modality === 'virtual' ? 'VIR' : 'FIS';
+  const generateNewCode = (modality: 'virtual' | 'fisico' | 'porquesi') => {
+    const prefix = modality === 'virtual' ? 'VIR' : modality === 'porquesi' ? 'PQS' : 'FIS';
     const rand = Math.floor(100 + Math.random() * 900);
     return `GCL-${prefix}-${rand}`;
   };
@@ -168,11 +168,12 @@ export const AdminView: React.FC<AdminViewProps> = ({
   const [bulkSyncResult, setBulkSyncResult] = useState<string | null>(null);
   // Cloud & Edit handlers
   const handleStartEditProduct = (p: Product) => {
+    const mod: 'virtual' | 'fisico' | 'porquesi' = p.productType || (p.category === 'porquesi' ? 'porquesi' : p.category === 'virtuales' ? 'virtual' : 'fisico');
     setEditingProduct(p);
-    setCode(p.code || generateNewCode(p.productType || (p.category === 'virtuales' ? 'virtual' : 'fisico')));
+    setCode(p.code || generateNewCode(mod));
     setName(p.name);
     setCategory(p.category === 'porquesi' ? 'porquesi' : p.category);
-    setProductModality(p.productType || (p.category === 'virtuales' ? 'virtual' : 'fisico'));
+    setProductModality(mod);
     setPrice(p.price.toString());
     setOriginalPrice(p.originalPrice ? p.originalPrice.toString() : '');
     setDiscountBadge(p.discountBadge || '');
@@ -301,7 +302,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
   };
 
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
-  const [productModality, setProductModality] = useState<'virtual' | 'fisico'>('virtual');
+  const [productModality, setProductModality] = useState<'virtual' | 'fisico' | 'porquesi'>('virtual');
   const [code, setCode] = useState(() => generateNewCode('virtual'));
   const [name, setName] = useState('');
   const [category, setCategory] = useState<'fisicos' | 'virtuales' | 'porquesi'>('virtuales');
@@ -343,19 +344,25 @@ export const AdminView: React.FC<AdminViewProps> = ({
   }, [products, downloadFile]);
 
   // Handle Modality Switch
-  const handleModalityChange = (type: 'virtual' | 'fisico') => {
+  const handleModalityChange = (type: 'virtual' | 'fisico' | 'porquesi') => {
     setProductModality(type);
     if (type === 'virtual') {
       setCategory('virtuales');
       setBadgeLabel('⚡ PRODUCTO VIRTUAL');
       setDeliveryInfo('Descarga inmediata al pagar');
       setSecondaryBadge('Descarga Inmediata');
+    } else if (type === 'porquesi') {
+      setCategory('porquesi');
+      setBadgeLabel('✨ PORQUE SÍ');
+      setDeliveryInfo('Envío o entrega especial coordinada');
+      setSecondaryBadge('Colección Exclusiva');
     } else {
       setCategory('fisicos');
       setBadgeLabel('📦 PRODUCTO FÍSICO');
       setDeliveryInfo('Recogida coordinada por WhatsApp');
       setSecondaryBadge('Entrega en punto de encuentro');
     }
+    setCode(generateNewCode(type));
   };
 
   // Add & Remove pickup locations
@@ -501,25 +508,26 @@ export const AdminView: React.FC<AdminViewProps> = ({
 
     const finalImage = imageUrl.trim() || 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&auto=format&fit=crop&q=80';
     const isVirtual = productModality === 'virtual';
+    const isPorqueSi = productModality === 'porquesi';
 
     const newProd: Product = {
       id: editingProduct ? editingProduct.id : `prod-${Date.now()}`,
       code: code.trim().toUpperCase() || generateNewCode(productModality),
       name: name.trim(),
-      category: category,
+      category: isPorqueSi ? 'porquesi' : category,
       productType: productModality,
       price: numPrice,
       originalPrice: originalPrice ? parseFloat(originalPrice) : undefined,
       discountBadge: discountBadge.trim() || undefined,
-      badgeLabel: badgeLabel.trim() || (isVirtual ? '⚡ PRODUCTO VIRTUAL' : '📦 PRODUCTO FÍSICO'),
-      badgeType: isVirtual ? 'virtual' : 'fisico',
-      secondaryBadge: secondaryBadge.trim() || (isVirtual ? 'Descarga Inmediata' : 'Recogida en punto'),
+      badgeLabel: badgeLabel.trim() || (isPorqueSi ? '✨ PORQUE SÍ' : isVirtual ? '⚡ PRODUCTO VIRTUAL' : '📦 PRODUCTO FÍSICO'),
+      badgeType: isPorqueSi ? 'porquesi' : (isVirtual ? 'virtual' : 'fisico'),
+      secondaryBadge: secondaryBadge.trim() || (isPorqueSi ? 'Colección Exclusiva' : isVirtual ? 'Descarga Inmediata' : 'Recogida en punto'),
       imageUrl: finalImage,
       thumbnailUrl: finalImage,
       altText: name.trim(),
-      description: description.trim() || (isVirtual ? 'Producto digital descargable al instante.' : 'Producto artesanal con entrega y punto de recogida coordinado.'),
+      description: description.trim() || (isPorqueSi ? 'Objeto único y divertido de la colección Porque Sí.' : isVirtual ? 'Producto digital descargable al instante.' : 'Producto artesanal con entrega y punto de recogida coordinado.'),
       fullDetails: fullDetails.trim() || description.trim() || 'Elaborado con dedicación en Gift Corner Lab por Marcelo & Angely.',
-      deliveryInfo: deliveryInfo.trim() || (isVirtual ? 'Descarga inmediata al pagar' : 'Puntos de recogida por WhatsApp'),
+      deliveryInfo: deliveryInfo.trim() || (isPorqueSi ? 'Envío coordinado o entrega especial' : isVirtual ? 'Descarga inmediata al pagar' : 'Puntos de recogida por WhatsApp'),
       stock: isVirtual ? undefined : (parseInt(stock) || 15),
       videoUrl: videoUrl.trim() || undefined,
       downloadFile: isVirtual ? (downloadFile || undefined) : undefined,
@@ -761,7 +769,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                     </label>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <button
                       type="button"
                       onClick={() => handleModalityChange('virtual')}
@@ -779,7 +787,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           ⚡ Producto Virtual
                         </p>
                         <p className="text-[11px] text-[#ccc3d8] leading-tight mt-0.5">
-                          Archivos descargables (.html, .zip). Descarga inmediata al verificar el pago. Sin dirección física.
+                          Archivos descargables (.html, .zip). Descarga inmediata al verificar el pago.
                         </p>
                       </div>
                     </button>
@@ -801,7 +809,29 @@ export const AdminView: React.FC<AdminViewProps> = ({
                           📦 Producto Físico
                         </p>
                         <p className="text-[11px] text-[#ccc3d8] leading-tight mt-0.5">
-                          No sube archivos HTML. Tras verificar el pago, se coordina por WhatsApp para acordar la entrega en puntos de referencia.
+                          Artesanal con entrega en puntos de encuentro o recojo por WhatsApp.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleModalityChange('porquesi')}
+                      className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
+                        productModality === 'porquesi'
+                          ? 'bg-[#ffb2b7]/20 border-[#ffb2b7] text-white shadow-lg'
+                          : 'bg-[#191b23] border-white/10 text-[#958da1] hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`p-2 rounded-lg shrink-0 ${productModality === 'porquesi' ? 'bg-[#ffb2b7] text-[#67001b]' : 'bg-[#272a32] text-[#958da1]'}`}>
+                        <Sparkles className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white flex items-center gap-1">
+                          ✨ PORQUE SÍ
+                        </p>
+                        <p className="text-[11px] text-[#ccc3d8] leading-tight mt-0.5">
+                          Aparece exclusivamente en la sección "Porque Sí" con su etiqueta especial.
                         </p>
                       </div>
                     </button>
@@ -819,7 +849,7 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         <input
                           type="text"
                           required
-                          placeholder={productModality === 'virtual' ? 'Ej. Carta Digital 3D & Cuponera Interactiva' : 'Ej. Lámpara Acrílica Grabada en Madera'}
+                          placeholder={productModality === 'virtual' ? 'Ej. Carta Digital 3D & Cuponera Interactiva' : productModality === 'porquesi' ? 'Ej. Pato de Goma con Sombrero Pirata' : 'Ej. Lámpara Acrílica Grabada en Madera'}
                           value={name}
                           onChange={(e) => setName(e.target.value)}
                           className="w-full bg-[#10131a] text-xs text-white px-3.5 py-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-[#7c3aed]"
@@ -863,11 +893,10 @@ export const AdminView: React.FC<AdminViewProps> = ({
                         >
                           {productModality === 'virtual' ? (
                             <option value="virtuales">⚡ Virtuales (Descargas)</option>
+                          ) : productModality === 'porquesi' ? (
+                            <option value="porquesi">🦄 PORQUE SÍ (Exclusivo Colección)</option>
                           ) : (
-                            <>
-                              <option value="fisicos">📦 Físicos (Recogida / Taller)</option>
-                              <option value="porquesi">🦄 PORQUE SÍ (Colección)</option>
-                            </>
+                            <option value="fisicos">📦 Físicos (Recogida / Taller)</option>
                           )}
                         </select>
                       </div>
@@ -917,8 +946,8 @@ export const AdminView: React.FC<AdminViewProps> = ({
                       </div>
                     </div>
 
-                    {/* Physical Stock Field */}
-                    {productModality === 'fisico' && (
+                    {/* Stock Field */}
+                    {(productModality === 'fisico' || productModality === 'porquesi') && (
                       <div>
                         <label className="text-xs text-[#958da1] font-semibold block mb-1">
                           Unidades en Stock Disponible:

@@ -58,8 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
           <img
             src={LOGO_URL}
             alt="Gift Corner Lab Logo"
-            className="h-9 w-auto object-contain transition-transform group-hover:scale-105"
-            referrerPolicy="no-referrer"
+            className="h-11 w-11 object-contain rounded-full shadow-[0_0_16px_rgba(124,58,237,0.4)] border border-[#7c3aed]/40 transition-transform group-hover:scale-110"
           />
           <div className="flex flex-col">
             <span className="font-display font-semibold text-lg lg:text-xl text-[#e1e2ec] tracking-tight leading-none">

@@ -35,8 +35,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const filteredProducts = useMemo(() => {
     let list = [...products];
 
-    // Category filter
-    if (selectedCategory !== 'todos') {
+    // Category filter: porquesi products only appear in the 'Porque Sí' view
+    if (selectedCategory === 'todos') {
+      list = list.filter((p) => p.category !== 'porquesi');
+    } else {
       list = list.filter((p) => p.category === selectedCategory);
     }
 
