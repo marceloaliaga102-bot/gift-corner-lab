@@ -182,3 +182,11 @@ h1, h2, h3, h4, h5, h6, .font-display {
   animation: giftGlowPulse 2s ease-in-out infinite;
 }
 
+/* Hide scrollbar for Chrome, Safari, Opera and cross-browser */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

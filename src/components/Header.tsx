@@ -322,6 +322,122 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
+      {/* Mobile Horizontally Scrollable Options Bar */}
+      <div className="lg:hidden border-t border-white/10 bg-[#10131a]/95 backdrop-blur-md px-3 py-2 flex items-center gap-2 overflow-x-auto scrollbar-none touch-pan-x select-none">
+        <button
+          type="button"
+          onClick={() => {
+            onSelectCategory('todos');
+            onNavigate('catalogo');
+          }}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm cursor-pointer ${
+            selectedCategory === 'todos' && currentView === 'catalogo'
+              ? 'bg-[#7c3aed] text-white'
+              : 'bg-[#272a32] text-[#ccc3d8] hover:text-white'
+          }`}
+        >
+          ✨ Todos
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onSelectCategory('fisicos');
+            onNavigate('catalogo');
+          }}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm cursor-pointer ${
+            selectedCategory === 'fisicos' && currentView === 'catalogo'
+              ? 'bg-[#03b5d3] text-[#001f26]'
+              : 'bg-[#272a32] text-[#ccc3d8] hover:text-white'
+          }`}
+        >
+          📦 Físicos
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onSelectCategory('virtuales');
+            onNavigate('catalogo');
+          }}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all shadow-sm cursor-pointer ${
+            selectedCategory === 'virtuales' && currentView === 'catalogo'
+              ? 'bg-[#7c3aed] text-white'
+              : 'bg-[#272a32] text-[#ccc3d8] hover:text-white'
+          }`}
+        >
+          ⚡ Virtuales
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onSelectCategory('porquesi');
+            onNavigate('porque-si');
+          }}
+          className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-extrabold transition-all shadow-sm cursor-pointer ${
+            currentView === 'porque-si' || selectedCategory === 'porquesi'
+              ? 'bg-[#c81a42] text-[#ffdedf]'
+              : 'bg-[#c81a42]/20 text-[#ffb2b7] border border-[#ffb2b7]/30'
+          }`}
+        >
+          🦄 ¡PORQUE SÍ!
+        </button>
+
+        <div className="h-4 w-[1px] bg-white/20 shrink-0 mx-1" />
+
+        <button
+          type="button"
+          onClick={() => onNavigate('nosotros')}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            currentView === 'nosotros'
+              ? 'bg-[#7c3aed] text-white'
+              : 'bg-[#191b23] text-[#ccc3d8]'
+          }`}
+        >
+          Nosotros
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('preguntas-faq')}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            currentView === 'preguntas-faq'
+              ? 'bg-[#7c3aed] text-white'
+              : 'bg-[#191b23] text-[#ccc3d8]'
+          }`}
+        >
+          FAQ
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('politicas')}
+          className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            currentView === 'politicas'
+              ? 'bg-[#7c3aed] text-white'
+              : 'bg-[#191b23] text-[#ccc3d8]'
+          }`}
+        >
+          Políticas
+        </button>
+
+        {isCreator && (
+          <button
+            type="button"
+            onClick={() => onNavigate('admin-panel')}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              currentView === 'admin-panel'
+                ? 'bg-[#c81a42] text-white'
+                : 'bg-[#c81a42]/30 text-[#ffdedf] border border-[#ffb2b7]/40'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[#ffb2b7]" />
+            <span>Admin</span>
+          </button>
+        )}
+      </div>
+
       {/* Mobile Menu Drawer */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-[#10131a] border-b border-white/10 p-4 flex flex-col gap-2">

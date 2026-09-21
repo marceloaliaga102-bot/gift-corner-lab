@@ -19,16 +19,28 @@ export interface ProductDownloadFile {
 
 export interface ProductComment {
   id: string;
+  productId: string;
+  userId: string;
   userName: string;
   userEmail?: string;
   rating: number; // 1-5
   comment: string;
   createdAt: string;
+  timestamp?: number;
 }
 
 export interface ProductRating {
+  productId: string;
   userId: string;
   rating: number;
+}
+
+export interface MusicConfig {
+  enabled: boolean;
+  youtubeUrl: string;
+  title?: string;
+  defaultVolume?: number; // 0 - 100
+  loop?: boolean;
 }
 
 export interface Product {

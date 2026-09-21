@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Product, Order, ProductDownloadFile, PaymentConfig } from '../../types';
+import { Product, Order, ProductDownloadFile, PaymentConfig, MusicConfig } from '../../types';
 import { 
   ShieldCheck, Package, DollarSign, Users, AlertCircle, Plus, Edit, Check, 
   Trash2, Video, FileCode, Upload, Image as ImageIcon, Eye, X, Lock, Sparkles, Download,
   MapPin, Zap, Box, QrCode, CreditCard, Database, RefreshCw, Save, HardDrive, CheckCircle2,
-  Cloud, Globe, Wifi, WifiOff, ExternalLink, Copy, CheckCircle, AlertTriangle, ArrowUpRight, Search
+  Cloud, Globe, Wifi, WifiOff, ExternalLink, Copy, CheckCircle, AlertTriangle, ArrowUpRight, Search,
+  Music, Volume2, Play
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
 import { 
@@ -27,9 +28,11 @@ import {
   testCloudConnection,
   cloudSubmitOrder,
   cloudDeleteOrder,
-  cloudClearAllOrders
+  cloudClearAllOrders,
+  subscribeToMusicConfig,
+  cloudSaveMusicConfig
 } from '../../services/cloudDatabase';
-import { saveOrders, getStoredOrders } from '../../utils/storage';
+import { saveOrders, getStoredOrders, getStoredMusicConfig } from '../../utils/storage';
 
 interface AdminViewProps {
   products: Product[];
@@ -60,12 +63,39 @@ export const AdminView: React.FC<AdminViewProps> = ({
   onClearAllOrders,
   onUpdateOrder
 }) => {
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'payment_config' | 'database' | 'cloud_sync'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'payment_config' | 'database' | 'cloud_sync' | 'music'>('products');
   const [ordersList, setOrdersList] = useState<Order[]>(orders);
   const [editingStockId, setEditingStockId] = useState<string | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [tempStock, setTempStock] = useState<number>(0);
   const [productSearchQuery, setProductSearchQuery] = useState<string>('');
+
+  // Background Music State
+  const [musicConfig, setMusicConfig] = useState<MusicConfig>(() => getStoredMusicConfig());
+  const [musicSaveStatus, setMusicSaveStatus] = useState<string>('');
+  const [isSavingMusic, setIsSavingMusic] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = subscribeToMusicConfig((config) => {
+      if (config) setMusicConfig(config);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleSaveMusicConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingMusic(true);
+    try {
+      await cloudSaveMusicConfig(musicConfig);
+      sfx.playChime();
+      setMusicSaveStatus('¡Configuración de música sincronizada con éxito para todos los clientes!');
+      setTimeout(() => setMusicSaveStatus(''), 5000);
+    } catch {
+      setMusicSaveStatus('Guardado en almacenamiento local.');
+    } finally {
+      setIsSavingMusic(false);
+    }
+  };
 
   useEffect(() => {
     setOrdersList(orders);
@@ -732,6 +762,19 @@ export const AdminView: React.FC<AdminViewProps> = ({
         >
           <Database className="w-4 h-4 shrink-0" />
           <span>Base de Datos ({dbStats.mbUsed} MB)</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setActiveTab('music'); sfx.playClick(); }}
+          className={`px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap shrink-0 transition-all ${
+            activeTab === 'music'
+              ? 'bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-md'
+              : 'text-[#958da1] hover:text-white hover:bg-[#272a32]'
+          }`}
+        >
+          <Music className="w-4 h-4 shrink-0" />
+          <span>Música de Fondo {musicConfig.enabled ? '🎶 (Activa)' : '🔇 (Off)'}</span>
         </button>
       </div>
 
@@ -1863,6 +1906,157 @@ service cloud.firestore {
               </pre>
             </div>
           </div>
+        </section>
+      )}
+
+      {/* ================= TAB 6: BACKGROUND MUSIC ================= */}
+      {activeTab === 'music' && (
+        <section className="rounded-3xl bg-[#191b23] border border-white/10 p-6 sm:p-8 shadow-2xl animate-fadeIn flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="p-2 rounded-xl bg-gradient-to-br from-pink-500/20 to-purple-500/20 text-pink-400 border border-pink-500/30">
+                  <Music className="w-5 h-5" />
+                </span>
+                <h2 className="font-display text-xl font-bold text-white">
+                  Música de Fondo &amp; Lista de Reproducción
+                </h2>
+              </div>
+              <p className="text-xs text-[#ccc3d8]">
+                Configura la música o playlist de YouTube que se reproducirá automáticamente de fondo para todos los visitantes de la tienda.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className={`px-3 py-1.5 rounded-full text-xs font-bold border flex items-center gap-2 ${
+                musicConfig.enabled 
+                  ? 'bg-pink-500/10 text-pink-400 border-pink-500/30' 
+                  : 'bg-zinc-800 text-zinc-400 border-white/10'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${musicConfig.enabled ? 'bg-pink-500 animate-pulse' : 'bg-zinc-500'}`} />
+                {musicConfig.enabled ? 'Música Encendida Global' : 'Música Desactivada'}
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveMusicConfig} className="flex flex-col gap-6">
+            {/* Toggle Enabled */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-[#10131a] border border-white/10">
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-white flex items-center gap-2">
+                  <Play className="w-4 h-4 text-pink-400" />
+                  Activar Música de Fondo Global
+                </span>
+                <span className="text-xs text-[#958da1]">
+                  Cuando esté activa, los clientes escucharán la música al entrar a la tienda y podrán pausarla o regular su volumen.
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={musicConfig.enabled}
+                  onChange={(e) => setMusicConfig({ ...musicConfig, enabled: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-12 h-6 bg-[#272a32] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-pink-500 peer-checked:to-purple-600"></div>
+              </label>
+            </div>
+
+            {/* YouTube URL input */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-white flex items-center gap-2">
+                <ExternalLink className="w-4 h-4 text-pink-400" />
+                URL de YouTube (Video o Lista de Reproducción): *
+              </label>
+              <input
+                type="url"
+                required={musicConfig.enabled}
+                placeholder="https://www.youtube.com/watch?v=... o https://youtu.be/... o playlist"
+                value={musicConfig.youtubeUrl}
+                onChange={(e) => setMusicConfig({ ...musicConfig, youtubeUrl: e.target.value })}
+                className="w-full bg-[#10131a] text-xs sm:text-sm text-white px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 transition-colors"
+              />
+              <span className="text-[11px] text-[#958da1]">
+                💡 Puedes colocar el enlace de un video relajante (lofi, instrumental, ambient) o una playlist completa de YouTube.
+              </span>
+            </div>
+
+            {/* Music Title */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-white">
+                Título o Nombre de la Canción / Ambiente:
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. Gift Corner Lab Chill &amp; Lofi Vibes"
+                value={musicConfig.title || ''}
+                onChange={(e) => setMusicConfig({ ...musicConfig, title: e.target.value })}
+                className="w-full bg-[#10131a] text-xs sm:text-sm text-white px-4 py-3 rounded-xl border border-white/10 focus:outline-none focus:border-pink-500 transition-colors"
+              />
+            </div>
+
+            {/* Volume slider & Loop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2 p-4 rounded-2xl bg-[#10131a] border border-white/10">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-white flex items-center gap-2">
+                    <Volume2 className="w-4 h-4 text-pink-400" />
+                    Volumen Inicial por Defecto:
+                  </label>
+                  <span className="text-xs font-mono font-bold text-pink-400">
+                    {musicConfig.defaultVolume ?? 35}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="100"
+                  value={musicConfig.defaultVolume ?? 35}
+                  onChange={(e) => setMusicConfig({ ...musicConfig, defaultVolume: parseInt(e.target.value, 10) })}
+                  className="w-full accent-pink-500 cursor-pointer"
+                />
+                <span className="text-[10px] text-[#958da1]">
+                  Recomendado 25% - 40% para una música suave y no invasiva.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-[#10131a] border border-white/10">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-white">Repetir en Bucle (Loop)</span>
+                  <span className="text-[11px] text-[#958da1]">Reiniciar la música al terminar</span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={musicConfig.loop ?? true}
+                    onChange={(e) => setMusicConfig({ ...musicConfig, loop: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-[#272a32] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-pink-500"></div>
+                </label>
+              </div>
+            </div>
+
+            {/* Save Status */}
+            {musicSaveStatus && (
+              <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center gap-2 animate-fadeIn">
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                <span>{musicSaveStatus}</span>
+              </div>
+            )}
+
+            {/* Submit Button */}
+            <div className="flex justify-end pt-4 border-t border-white/10">
+              <button
+                type="submit"
+                disabled={isSavingMusic}
+                className="px-6 py-3 rounded-2xl bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:opacity-95 text-white font-display text-xs sm:text-sm font-bold flex items-center gap-2 shadow-xl shadow-pink-500/20 transition-all active:scale-95 disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                <span>{isSavingMusic ? 'Guardando...' : 'Guardar Música Global'}</span>
+              </button>
+            </div>
+          </form>
         </section>
       )}
     </div>

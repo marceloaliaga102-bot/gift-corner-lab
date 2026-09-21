@@ -2,10 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Product, User, ProductComment, ProductRating } from '../../types';
 import { 
   X, ShoppingCart, Check, PlayCircle, Clock, Box, Zap, Sparkles, Video, FileCode, ExternalLink,
-  MapPin, MessageCircle, Star, MessageSquare, ChevronDown, ChevronUp, Send, User as UserIcon
+  MapPin, MessageCircle, Star, MessageSquare, ChevronDown, ChevronUp, Send, User as UserIcon, Trash2
 } from 'lucide-react';
 import { sfx } from '../../utils/audio';
-import { getStoredComments, saveStoredComment, getStoredRatings, saveStoredRating } from '../../utils/storage';
+import { 
+  subscribeToProductComments, 
+  cloudAddComment, 
+  cloudDeleteComment, 
+  subscribeToProductRatings, 
+  cloudAddRating 
+} from '../../services/cloudDatabase';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -77,42 +83,47 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [commentRating, setCommentRating] = useState<number>(5);
   const [commentText, setCommentText] = useState<string>('');
   const [commentSuccess, setCommentSuccess] = useState<string>('');
+  const [isSubmittingComment, setIsSubmittingComment] = useState<boolean>(false);
 
   useEffect(() => {
     if (!product) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Load persisted comments & ratings
-    const storedComments = getStoredComments(product.id);
-    const storedRatings = getStoredRatings(product.id);
+    // Real-time Firestore sync with localStorage fallback
+    const unsubComments = subscribeToProductComments(product.id, (cloudComments) => {
+      setComments(cloudComments);
+    });
 
-    // Initial seed if product has no ratings yet
-    if (storedRatings.length === 0) {
-      const initialRating = [
-        { userId: 'default-1', rating: 5 },
-        { userId: 'default-2', rating: 5 },
-        { userId: 'default-3', rating: 4 }
-      ];
-      setRatings(initialRating);
-    } else {
-      setRatings(storedRatings);
-    }
+    const unsubRatings = subscribeToProductRatings(product.id, (cloudRatings) => {
+      if (cloudRatings.length === 0) {
+        setRatings([
+          { productId: product.id, userId: 'default-1', rating: 5 },
+          { productId: product.id, userId: 'default-2', rating: 5 },
+          { productId: product.id, userId: 'default-3', rating: 4 }
+        ]);
+      } else {
+        setRatings(cloudRatings);
+        if (currentUser) {
+          const myRating = cloudRatings.find(r => r.userId === currentUser.id);
+          if (myRating) {
+            setUserRating(myRating.rating);
+            setHasRated(true);
+          }
+        }
+      }
+    });
 
-    setComments(storedComments);
     if (currentUser) {
       setCommentAuthor(currentUser.name);
-      const myRating = storedRatings.find(r => r.userId === currentUser.id);
-      if (myRating) {
-        setUserRating(myRating.rating);
-        setHasRated(true);
-      }
     }
 
     return () => {
       document.body.style.overflow = prev;
+      unsubComments();
+      unsubRatings();
     };
-  }, [product, currentUser]);
+  }, [product?.id, currentUser]);
 
   if (!product) return null;
 
@@ -126,24 +137,27 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     ? (ratings.reduce((acc, curr) => acc + curr.rating, 0) / totalRatings).toFixed(1)
     : '5.0';
 
-  const handleRateProduct = (star: number) => {
+  const handleRateProduct = async (star: number) => {
     setUserRating(star);
     setHasRated(true);
     sfx.playChime();
 
     const userId = currentUser ? currentUser.id : `guest-${Date.now()}`;
-    const newRatingItem: ProductRating = { userId, rating: star };
-    const updated = saveStoredRating(product.id, newRatingItem);
-    setRatings(updated);
+    const newRatingItem: ProductRating = { productId: product.id, userId, rating: star };
+    await cloudAddRating(product.id, newRatingItem);
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentText.trim()) return;
 
+    setIsSubmittingComment(true);
     const authorName = commentAuthor.trim() || (currentUser ? currentUser.name : 'Cliente de Gift Corner');
+    const userId = currentUser ? currentUser.id : `guest-${Date.now()}`;
     const newComment: ProductComment = {
       id: `comment-${Date.now()}`,
+      productId: product.id,
+      userId,
       userName: authorName,
       userEmail: currentUser?.email,
       rating: commentRating,
@@ -154,23 +168,33 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      })
+      }),
+      timestamp: Date.now()
     };
 
-    const updated = saveStoredComment(product.id, newComment);
-    setComments(updated);
-    setCommentText('');
-    setCommentSuccess('¡Tu reseña ha sido publicada con éxito!');
-    sfx.playChime();
+    try {
+      await cloudAddComment(product.id, newComment);
+      await cloudAddRating(product.id, { productId: product.id, userId, rating: commentRating });
 
-    // Also update ratings with this comment rating
-    const userId = currentUser ? currentUser.id : `commenter-${Date.now()}`;
-    const updatedRatings = saveStoredRating(product.id, { userId, rating: commentRating });
-    setRatings(updatedRatings);
+      setCommentText('');
+      setCommentSuccess('¡Tu reseña ha sido publicada y sincronizada con éxito!');
+      sfx.playChime();
 
-    setTimeout(() => {
-      setCommentSuccess('');
-    }, 4000);
+      setTimeout(() => {
+        setCommentSuccess('');
+      }, 4000);
+    } catch {
+      setCommentSuccess('Publicado localmente.');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (window.confirm('¿Estás seguro de que deseas eliminar este comentario?')) {
+      sfx.playPop();
+      await cloudDeleteComment(product.id, commentId);
+    }
   };
 
   return (
@@ -606,18 +630,31 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Stars */}
-                        <div className="flex items-center">
-                          {[1, 2, 3, 4, 5].map((star) => (
-                            <Star
-                              key={star}
-                              className={`w-3.5 h-3.5 ${
-                                star <= c.rating
-                                  ? 'fill-amber-400 text-amber-400'
-                                  : 'text-zinc-700'
-                              }`}
-                            />
-                          ))}
+                        {/* Stars & Action */}
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-3.5 h-3.5 ${
+                                  star <= c.rating
+                                    ? 'fill-amber-400 text-amber-400'
+                                    : 'text-zinc-700'
+                                }`}
+                              />
+                            ))}
+                          </div>
+
+                          {currentUser && (currentUser.role === 'creator' || currentUser.id === c.userId || (currentUser.email && c.userEmail && currentUser.email === c.userEmail)) && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(c.id)}
+                              className="p-1 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                              title="Eliminar comentario"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
 

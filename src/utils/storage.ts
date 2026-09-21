@@ -1,4 +1,4 @@
-import { User, Product, Order, ProductComment, ProductRating } from '../types';
+import { User, Product, Order, ProductComment, ProductRating, MusicConfig } from '../types';
 import { PRODUCTS } from '../data/products';
 
 // Default creator credentials
@@ -154,4 +154,40 @@ export const saveStoredRating = (productId: string, rating: ProductRating): Prod
   localStorage.setItem(`gc_product_ratings_${productId}`, JSON.stringify(updated));
   return updated;
 };
+
+export const deleteStoredComment = (productId: string, commentId: string): ProductComment[] => {
+  const existing = getStoredComments(productId);
+  const updated = existing.filter(c => c.id !== commentId);
+  localStorage.setItem(`gc_product_comments_${productId}`, JSON.stringify(updated));
+  return updated;
+};
+
+export const getStoredMusicConfig = (): MusicConfig => {
+  try {
+    const saved = localStorage.getItem('gc_music_config');
+    if (!saved) {
+      return {
+        enabled: false,
+        youtubeUrl: '',
+        title: 'Música de Fondo Gift Corner',
+        defaultVolume: 35,
+        loop: true
+      };
+    }
+    return JSON.parse(saved);
+  } catch {
+    return {
+      enabled: false,
+      youtubeUrl: '',
+      title: 'Música de Fondo Gift Corner',
+      defaultVolume: 35,
+      loop: true
+    };
+  }
+};
+
+export const saveStoredMusicConfig = (config: MusicConfig): void => {
+  localStorage.setItem('gc_music_config', JSON.stringify(config));
+};
+
 

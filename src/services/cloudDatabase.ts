@@ -1,4 +1,3 @@
-// Centralized Cloud Database Service (Firebase Firestore + Local Fallback Cache)
 import { 
   collection, 
   doc, 
@@ -7,7 +6,9 @@ import {
   updateDoc, 
   onSnapshot, 
   getDocs, 
-  writeBatch
+  writeBatch,
+  query,
+  where
 } from 'firebase/firestore';
 import { 
   getFirestoreInstance, 
@@ -15,14 +16,21 @@ import {
   FirebaseConfigData,
   initFirebase 
 } from './firebaseConfig';
-import { Product, Order, PaymentConfig, User } from '../types';
+import { Product, Order, PaymentConfig, User, ProductComment, ProductRating, MusicConfig } from '../types';
 import { 
   getStoredProducts, 
   saveProducts as saveLocalProducts, 
   getStoredOrders, 
   saveOrders as saveLocalOrders,
   getStoredUsers,
-  saveUser as saveLocalUser
+  saveUser as saveLocalUser,
+  getStoredComments,
+  saveStoredComment,
+  deleteStoredComment,
+  getStoredRatings,
+  saveStoredRating,
+  getStoredMusicConfig,
+  saveStoredMusicConfig
 } from '../utils/storage';
 import { getPaymentConfig, savePaymentConfig as saveLocalPaymentConfig } from '../utils/database';
 
@@ -580,4 +588,214 @@ export const testCloudConnection = async (customConfig?: FirebaseConfigData): Pr
       message: `Error al conectar: ${err.message || 'Error desconocido'}` 
     };
   }
+};
+
+/* ==========================================================================
+   PRODUCT COMMENTS SYNCHRONIZATION
+   ========================================================================== */
+
+export const subscribeToProductComments = (
+  productId: string, 
+  onUpdate: (comments: ProductComment[]) => void
+): (() => void) => {
+  const db = getFirestoreInstance();
+
+  if (db && isFirebaseConfigured()) {
+    try {
+      const commentsCol = collection(db, 'comments');
+      const q = query(commentsCol, where('productId', '==', productId));
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const list: ProductComment[] = [];
+          snapshot.forEach((d) => {
+            const data = d.data() as ProductComment;
+            if (data && data.id) {
+              list.push(data);
+            }
+          });
+          list.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+          localStorage.setItem(`gc_product_comments_${productId}`, JSON.stringify(list));
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('Firestore comments listener error:', error);
+          onUpdate(getStoredComments(productId));
+        }
+      );
+      return unsubscribe;
+    } catch (err) {
+      console.error('Error attaching comments listener:', err);
+    }
+  }
+
+  onUpdate(getStoredComments(productId));
+  return () => {};
+};
+
+export const cloudAddComment = async (
+  productId: string,
+  comment: ProductComment
+): Promise<{ success: boolean; error?: string }> => {
+  saveStoredComment(productId, comment);
+
+  const db = getFirestoreInstance();
+  if (db && isFirebaseConfigured()) {
+    try {
+      const sanitized = deepSanitizeForFirestore(comment);
+      await setDoc(doc(db, 'comments', comment.id), sanitized);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error saving comment to Firebase:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true };
+};
+
+export const cloudDeleteComment = async (
+  productId: string,
+  commentId: string
+): Promise<{ success: boolean; error?: string }> => {
+  deleteStoredComment(productId, commentId);
+
+  const db = getFirestoreInstance();
+  if (db && isFirebaseConfigured()) {
+    try {
+      await deleteDoc(doc(db, 'comments', commentId));
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error deleting comment from Firebase:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true };
+};
+
+/* ==========================================================================
+   PRODUCT RATINGS SYNCHRONIZATION
+   ========================================================================== */
+
+export const subscribeToProductRatings = (
+  productId: string,
+  onUpdate: (ratings: ProductRating[]) => void
+): (() => void) => {
+  const db = getFirestoreInstance();
+
+  if (db && isFirebaseConfigured()) {
+    try {
+      const ratingsCol = collection(db, 'ratings');
+      const q = query(ratingsCol, where('productId', '==', productId));
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const list: ProductRating[] = [];
+          snapshot.forEach((d) => {
+            const data = d.data() as ProductRating;
+            if (data && data.userId && data.rating) {
+              list.push(data);
+            }
+          });
+          localStorage.setItem(`gc_product_ratings_${productId}`, JSON.stringify(list));
+          onUpdate(list);
+        },
+        (error) => {
+          console.warn('Firestore ratings listener error:', error);
+          onUpdate(getStoredRatings(productId));
+        }
+      );
+      return unsubscribe;
+    } catch (err) {
+      console.error('Error attaching ratings listener:', err);
+    }
+  }
+
+  onUpdate(getStoredRatings(productId));
+  return () => {};
+};
+
+export const cloudAddRating = async (
+  productId: string,
+  rating: ProductRating
+): Promise<{ success: boolean; error?: string }> => {
+  saveStoredRating(productId, rating);
+
+  const db = getFirestoreInstance();
+  if (db && isFirebaseConfigured()) {
+    try {
+      const docId = `${productId}_${rating.userId}`;
+      const sanitized = deepSanitizeForFirestore({
+        ...rating,
+        productId,
+        updatedAt: Date.now()
+      });
+      await setDoc(doc(db, 'ratings', docId), sanitized);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error saving rating to Firebase:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true };
+};
+
+/* ==========================================================================
+   BACKGROUND MUSIC CONFIG SYNCHRONIZATION
+   ========================================================================== */
+
+export const subscribeToMusicConfig = (
+  onUpdate: (config: MusicConfig) => void
+): (() => void) => {
+  const db = getFirestoreInstance();
+
+  if (db && isFirebaseConfigured()) {
+    try {
+      const musicDoc = doc(db, 'settings', 'music');
+      const unsubscribe = onSnapshot(
+        musicDoc,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data() as MusicConfig;
+            saveStoredMusicConfig(data);
+            onUpdate(data);
+          } else {
+            onUpdate(getStoredMusicConfig());
+          }
+        },
+        (error) => {
+          console.warn('Firestore music listener error:', error);
+          onUpdate(getStoredMusicConfig());
+        }
+      );
+      return unsubscribe;
+    } catch (err) {
+      console.error('Error attaching music listener:', err);
+    }
+  }
+
+  onUpdate(getStoredMusicConfig());
+  return () => {};
+};
+
+export const cloudSaveMusicConfig = async (
+  config: MusicConfig
+): Promise<{ success: boolean; error?: string }> => {
+  saveStoredMusicConfig(config);
+
+  const db = getFirestoreInstance();
+  if (db && isFirebaseConfigured()) {
+    try {
+      const sanitized = deepSanitizeForFirestore(config);
+      await setDoc(doc(db, 'settings', 'music'), sanitized);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error saving music config to Firebase:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  return { success: true };
 };

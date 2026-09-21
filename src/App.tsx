@@ -17,6 +17,7 @@ import { CheckoutModal } from './components/modals/CheckoutModal';
 import { ProductDetailModal } from './components/modals/ProductDetailModal';
 import { AuthModal } from './components/modals/AuthModal';
 import { GiftIntroOverlay } from './components/GiftIntroOverlay';
+import { BackgroundMusicPlayer } from './components/BackgroundMusicPlayer';
 import { 
   getStoredProducts, 
   saveProducts, 
@@ -446,6 +447,9 @@ export default function App() {
         />,
         document.body
       )}
+
+      {/* Background Music Player (Floating with YouTube embed & client volume/mute controls) */}
+      <BackgroundMusicPlayer />
 
       {/* Interactive Gift Entrance Overlay */}
       <GiftIntroOverlay
